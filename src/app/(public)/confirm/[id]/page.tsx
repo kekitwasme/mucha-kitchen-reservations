@@ -237,8 +237,8 @@ export default function ConfirmPage() {
           Book Another Table
         </Button>
         {!isTerminal && (
-          <Button variant="outline" className="flex-1" render={<Link href={`/cancel/${id}`} />}>
-            Cancel Reservation
+          <Button variant="outline" className="flex-1" render={<Link href={`/reschedule/${id}`} />}>
+            Edit Time
           </Button>
         )}
       </div>

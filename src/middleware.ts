@@ -15,6 +15,7 @@ export default function middleware(req: NextRequest) {
     nextUrl.pathname.startsWith('/book') ||
     nextUrl.pathname.startsWith('/confirm') ||
     nextUrl.pathname.startsWith('/cancel') ||
+    nextUrl.pathname.startsWith('/reschedule') ||
     nextUrl.pathname === '/login' ||
     nextUrl.pathname.startsWith('/api/auth') ||
     nextUrl.pathname.startsWith('/api/webhooks') ||
@@ -22,11 +23,12 @@ export default function middleware(req: NextRequest) {
     nextUrl.pathname.startsWith('/api/tables');
 
   // POST /api/reservations (customer booking) and POST /api/reservations/*/cancel are public
-  const isPublicReservationPost =
+  const isPublicReservationAction =
     (nextUrl.pathname === '/api/reservations' && req.method === 'POST') ||
-    (/^\/api\/reservations\/[^/]+\/cancel$/.test(nextUrl.pathname) && req.method === 'POST');
+    (/^\/api\/reservations\/[^/]+\/cancel$/.test(nextUrl.pathname) && req.method === 'POST') ||
+    (/^\/api\/reservations\/[^/]+\/reschedule$/.test(nextUrl.pathname) && req.method === 'POST');
 
-  if (isPublicRoute || isPublicReservationPost) {
+  if (isPublicRoute || isPublicReservationAction) {
     return NextResponse.next();
   }
 
