@@ -274,7 +274,7 @@ export async function updateSquareBooking(
       },
     });
 
-    console.log(`[Square Adapter] updateSquareBooking succeeded for ${squareBookingId}`);
+    console.debug(`[Square Adapter] updateSquareBooking succeeded for ${squareBookingId}`);
     return true;
   } catch (error) {
     console.error('[Square Adapter] updateSquareBooking failed:', error);

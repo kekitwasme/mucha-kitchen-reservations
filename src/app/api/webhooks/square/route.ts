@@ -290,13 +290,13 @@ export async function POST(request: NextRequest) {
     const eventType = event.type || '';
     const eventId = event.event_id || `unknown-${Date.now()}`;
 
-    console.log(`[Square Webhook] Received event: ${eventType} (id: ${eventId})`);
+    console.debug(`[Square Webhook] Received event: ${eventType} (id: ${eventId})`);
 
     // ── Idempotency check ────────────────────────────────────────────────
     if (eventId && eventId !== `unknown-${Date.now()}`) {
       const isDup = await isDuplicateEvent(eventId);
       if (isDup) {
-        console.log(`[Square Webhook] Duplicate event ${eventId}, skipping`);
+        console.debug(`[Square Webhook] Duplicate event ${eventId}, skipping`);
         return NextResponse.json({ received: true, duplicate: true });
       }
     }
@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Unknown event type — acknowledge but skip
-    console.log(`[Square Webhook] Unhandled event type: ${eventType}`);
+    console.debug(`[Square Webhook] Unhandled event type: ${eventType}`);
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error('[POST /api/webhooks/square]', err);
@@ -381,7 +381,7 @@ async function handleBookingCreated(eventId: string, data: SquareBookingData): P
     where: { squareBookingId },
   });
   if (existing) {
-    console.log(`[Square Webhook] booking.created: reservation ${existing.id} already exists for Square booking ${squareBookingId}`);
+    console.debug(`[Square Webhook] booking.created: reservation ${existing.id} already exists for Square booking ${squareBookingId}`);
     return true; // Already exists, mark as processed
   }
 
@@ -478,7 +478,7 @@ async function handleBookingCreated(eventId: string, data: SquareBookingData): P
     },
   });
 
-  console.log(`[Square Webhook] booking.created: created reservation ${reservation.id} for Square booking ${squareBookingId}`);
+  console.debug(`[Square Webhook] booking.created: created reservation ${reservation.id} for Square booking ${squareBookingId}`);
   return true;
 }
 
@@ -499,7 +499,7 @@ async function handleBookingUpdated(eventId: string, data: SquareBookingData): P
 
   // If no local reservation exists, treat as booking.created (upsert)
   if (!reservation) {
-    console.log(`[Square Webhook] booking.updated: no local reservation for ${squareBookingId}, treating as booking.created`);
+    console.debug(`[Square Webhook] booking.updated: no local reservation for ${squareBookingId}, treating as booking.created`);
     return handleBookingCreated(eventId, data);
   }
 
@@ -590,7 +590,7 @@ async function handleBookingUpdated(eventId: string, data: SquareBookingData): P
       });
     });
 
-    console.log(`[Square Webhook] booking.updated: updated reservation ${reservation.id}, fields: ${Object.keys(updateData).join(', ')}`);
+    console.debug(`[Square Webhook] booking.updated: updated reservation ${reservation.id}, fields: ${Object.keys(updateData).join(', ')}`);
 
     // Re-assign tables if time or party size changed
     if (updateData.startTime || updateData.partySize) {
@@ -633,7 +633,7 @@ async function handleBookingUpdated(eventId: string, data: SquareBookingData): P
         },
       },
     });
-    console.log(`[Square Webhook] booking.updated: no fields to update for reservation ${reservation.id}`);
+    console.debug(`[Square Webhook] booking.updated: no fields to update for reservation ${reservation.id}`);
   }
 
   return true;
@@ -681,9 +681,9 @@ async function handleBookingCancelled(eventId: string, data: SquareBookingData):
       });
     });
 
-    console.log(`[Square Webhook] Cancelled reservation ${reservation.id}`);
+    console.debug(`[Square Webhook] Cancelled reservation ${reservation.id}`);
   } else {
-    console.log(`[Square Webhook] Reservation ${reservation.id} already cancelled`);
+    console.debug(`[Square Webhook] Reservation ${reservation.id} already cancelled`);
   }
 
   return true;
@@ -715,6 +715,6 @@ async function handlePaymentUpdated(eventId: string, data: SquarePaymentData): P
       data: { status: mappedStatus as PaymentStatus },
     });
 
-    console.log(`[Square Webhook] Updated payment ${payment.id} to ${mappedStatus}`);
+    console.debug(`[Square Webhook] Updated payment ${payment.id} to ${mappedStatus}`);
   }
 }
