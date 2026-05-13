@@ -55,7 +55,7 @@ interface ActionItem {
 }
 
 const primaryActions: Record<string, ActionItem | null> = {
-  pending: { label: 'Confirm', status: 'confirmed', variant: 'default' },
+  pending: null, // Auto-accepted on creation, no confirm needed
   confirmed: { label: 'Seat', status: 'seated', variant: 'default' },
   seated: { label: 'Complete', status: 'completed', variant: 'default' },
   completed: null,
@@ -65,7 +65,6 @@ const primaryActions: Record<string, ActionItem | null> = {
 
 const dropdownActions: Record<string, ActionItem[]> = {
   pending: [
-    { label: 'Confirm', status: 'confirmed', variant: 'default' },
     { label: 'Edit', status: '__edit__', variant: 'outline' },
     { label: 'Cancel', status: 'cancelled', variant: 'destructive' },
   ],
@@ -82,12 +81,8 @@ const dropdownActions: Record<string, ActionItem[]> = {
     { label: 'Reassign Table', status: '__reassign__', variant: 'outline' },
     { label: 'Add Note', status: '__note__', variant: 'outline' },
   ],
-  completed: [
-    { label: 'Reopen', status: 'confirmed', variant: 'outline' },
-  ],
-  cancelled: [
-    { label: 'Reopen', status: 'pending', variant: 'outline' },
-  ],
+  completed: [],
+  cancelled: [],
   no_show: [],
 };
 
@@ -259,10 +254,7 @@ export default function ReservationsPage() {
                           {/* More actions dropdown */}
                           {actions.length > 0 && (
                             <Popover>
-                              <PopoverTrigger>
-                                <Button size="sm" variant="outline" className="px-2">
-                                  ⋮
-                                </Button>
+                              <PopoverTrigger render={<button type="button" className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground">⋮</button>}>
                               </PopoverTrigger>
                               <PopoverContent align="end" side="bottom" className="w-44 p-1">
                                 <div className="flex flex-col gap-0.5">

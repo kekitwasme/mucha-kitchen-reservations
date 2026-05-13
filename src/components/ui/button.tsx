@@ -1,5 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
+import type { ComponentPropsWithRef, ElementType, ReactElement } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -40,15 +41,35 @@ const buttonVariants = cva(
   }
 )
 
+function isNativeButtonElement(render: unknown): boolean {
+  if (!render) return true;
+  // ReactElement — check the type
+  if (typeof render === 'object' && render !== null && 'type' in render) {
+    const el = render as ReactElement;
+    // String type = native element (e.g. "button", "a", "div")
+    if (typeof el.type === 'string') return el.type === 'button';
+    // Function/class component — assume not a native button
+    return false;
+  }
+  return false;
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // When rendering a non-button element (like <Link> or <a>), disable nativeButton
+  // to prevent Base UI accessibility warnings and keep proper semantics.
+  const nativeButton = render ? isNativeButtonElement(render) : undefined;
+
   return (
     <ButtonPrimitive
       data-slot="button"
+      nativeButton={nativeButton}
+      render={render}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

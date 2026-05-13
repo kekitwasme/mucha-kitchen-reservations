@@ -62,6 +62,10 @@ function DrawerContent({
         {...props}
       >
         <div className="mx-auto mt-4 hidden h-1 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
+        {/* Visually hidden title for accessibility — Radix requires DialogTitle */}
+        <DrawerPrimitive.Title className="sr-only">
+          Drawer
+        </DrawerPrimitive.Title>
         {children}
       </DrawerPrimitive.Content>
     </DrawerPortal>

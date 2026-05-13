@@ -20,7 +20,6 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -29,18 +28,13 @@ const navItems: NavItem[] = [
   { href: '/staff/reservations', label: 'Reservations', icon: CalendarCheck },
   { href: '/staff/walk-ins', label: 'Walk-ins', icon: UserPlus },
   { href: '/staff/timeline', label: 'Timeline', icon: Clock },
-  { href: '/staff/settings', label: 'Settings', icon: Settings, adminOnly: true },
+  { href: '/staff/settings', label: 'Settings', icon: Settings },
 ];
 
 function SidebarContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const sidebar = useSidebarStore();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === 'admin';
-
-  const visibleNavItems = navItems.filter(
-    (item) => !item.adminOnly || isAdmin
-  );
 
   const isActive = (href: string) => {
     if (href === '/staff') return pathname === '/staff';
@@ -64,7 +58,7 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
           <h1 className="text-lg font-bold">Mucha Kitchen</h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          {visibleNavItems.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
@@ -88,7 +82,7 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-slate-700">
           {session?.user && (
             <p className="text-xs text-slate-400 mb-3 truncate">
-              {session.user.email} ({session.user.role ?? 'staff'})
+              {session.user.email}
             </p>
           )}
           <Button

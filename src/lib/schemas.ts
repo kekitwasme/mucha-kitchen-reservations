@@ -13,7 +13,7 @@ export const ReservationStatusEnum = z.enum([
   'no_show',
 ]);
 
-export const ReservationSourceEnum = z.enum(['online', 'walk_in', 'phone']);
+export const ReservationSourceEnum = z.enum(['online', 'walk_in', 'phone', 'square']);
 export const PaymentStatusEnum = z.enum(['pending', 'completed', 'failed', 'refunded']);
 export const PaymentTypeEnum = z.enum(['deposit', 'per_person_deposit', 'no_show_fee', 'full_prepayment']);
 

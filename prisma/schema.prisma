@@ -33,6 +33,7 @@ enum ReservationSource {
   online
   walk_in
   phone
+  square
 }
 
 enum PaymentStatus {
@@ -49,10 +50,6 @@ enum PaymentType {
   full_prepayment
 }
 
-enum StaffRole {
-  admin
-  staff
-}
 
 enum AuditAction {
   created
@@ -304,11 +301,22 @@ model AuditLog {
   @@index([reservationId])
 }
 
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  eventType  String
+  eventId    String   @unique
+  processed  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([eventId])
+  @@index([createdAt])
+}
+
 model StaffUser {
   id           String    @id @default(cuid())
   restaurantId String
   userId       String    @unique
-  role         StaffRole @default(staff)
+  role         String    @default("staff")
   active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
 

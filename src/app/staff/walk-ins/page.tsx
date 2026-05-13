@@ -269,7 +269,7 @@ function QuickEntryForm({ onCreated }: { onCreated: () => void }) {
       startTime,
       notes: 'Walk-in — waiting',
       source: 'walk_in',
-      status: 'pending',
+      status: 'confirmed',
     });
   };
 
@@ -502,10 +502,10 @@ function Waitlist() {
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['walkIns', 'pending', today],
+    queryKey: ['walkIns', 'confirmed', today],
     queryFn: async () => {
       const res = await fetch(
-        `/api/reservations?dateFrom=${today}&dateTo=${today}&source=walk_in&status=pending`
+        `/api/reservations?dateFrom=${today}&dateTo=${today}&source=walk_in&status=confirmed`
       );
       if (!res.ok) throw new Error('Failed to fetch waitlist');
       return res.json();

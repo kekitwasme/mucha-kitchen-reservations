@@ -30,18 +30,17 @@ export default function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // For staff/admin routes: check for auth cookie presence (lightweight)
+  // For staff routes: check for auth cookie presence (lightweight)
   // Full auth verification happens in API routes / page components
-  const hasAuthCookie = req.cookies.has('next-auth.session-token') || req.cookies.has('__Secure-next-auth.session-token');
+  const hasAuthCookie = req.cookies.has('authjs.session-token') || req.cookies.has('__Secure-authjs.session-token') || req.cookies.has('next-auth.session-token');
 
   const isStaffRoute = nextUrl.pathname.startsWith('/staff');
-  const isAdminRoute = nextUrl.pathname.startsWith('/admin');
   const isProtectedApi = nextUrl.pathname.startsWith('/api/admin') ||
     nextUrl.pathname.startsWith('/api/dashboard') ||
     nextUrl.pathname.startsWith('/api/reservations') ||
     nextUrl.pathname.startsWith('/api/table-');
 
-  if ((isStaffRoute || isAdminRoute || isProtectedApi) && !hasAuthCookie) {
+  if ((isStaffRoute || isProtectedApi) && !hasAuthCookie) {
     if (nextUrl.pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
     }

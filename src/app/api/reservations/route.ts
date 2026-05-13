@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
             reservationDate: date,
             startTime,
             endTime,
-            status: requestedStatus || 'pending',
+            status: requestedStatus || 'confirmed',
             source: source || 'online',
             notes: notes || null,
           },

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Line } from 'react-konva';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFloorPlanStore } from '@/lib/store';
@@ -744,7 +745,7 @@ export default function FloorPlanPage() {
       setPreviewReservations([]);
       return;
     }
-    const dateStr = store.selectedDate.toISOString().split('T')[0];
+    const dateStr = format(store.selectedDate, 'yyyy-MM-dd');
     fetch(`/api/reservations?dateFrom=${dateStr}&dateTo=${dateStr}`)
       .then((r) => r.json())
       .then((data) => {
@@ -1086,7 +1087,7 @@ export default function FloorPlanPage() {
           <div className="flex items-center gap-1">
             <input
               type="date"
-              value={store.selectedDate.toISOString().split('T')[0]}
+              value={format(store.selectedDate, 'yyyy-MM-dd')}
               onChange={(e) => store.setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
               className="h-8 rounded-md border border-input px-2 text-sm"
             />

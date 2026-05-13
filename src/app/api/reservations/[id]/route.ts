@@ -174,16 +174,20 @@ export async function PATCH(
       if (existing.squareBookingId) {
         (async () => {
           try {
-            await updateSquareBooking(existing.squareBookingId, {
-              reservationId: id,
-              customerName: data.customerName ?? existing.customerName,
-              customerPhone: data.customerPhone ?? existing.customerPhone,
-              startTime: startDateTime,
-              endTime: endDateTime,
-              partySize,
-              tableNames: [],
-              notes: data.notes ?? existing.notes ?? undefined,
-            });
+            if (data.status === 'cancelled') {
+              await cancelSquareBooking(existing.squareBookingId);
+            } else {
+              await updateSquareBooking(existing.squareBookingId, {
+                reservationId: id,
+                customerName: data.customerName ?? existing.customerName,
+                customerPhone: data.customerPhone ?? existing.customerPhone,
+                startTime: startDateTime,
+                endTime: endDateTime,
+                partySize,
+                tableNames: [],
+                notes: data.notes ?? existing.notes ?? undefined,
+              });
+            }
           } catch (err) {
             console.error('[Square Sync] Update sync failed:', err);
           }
@@ -217,6 +221,31 @@ export async function PATCH(
             details: { status: data.status },
           },
         });
+      }
+
+      // Async Square sync for simple updates (including cancellation)
+      if (existing.squareBookingId) {
+        (async () => {
+          try {
+            if (data.status === 'cancelled') {
+              await cancelSquareBooking(existing.squareBookingId);
+            } else if (data.status && data.status !== existing.status) {
+              // Status change that isn't cancellation — update Square
+              await updateSquareBooking(existing.squareBookingId, {
+                reservationId: id,
+                customerName: data.customerName ?? existing.customerName,
+                customerPhone: data.customerPhone ?? existing.customerPhone,
+                startTime: existing.startTime,
+                endTime: existing.endTime,
+                partySize: existing.partySize,
+                tableNames: [],
+                notes: data.notes ?? existing.notes ?? undefined,
+              });
+            }
+          } catch (err) {
+            console.error('[Square Sync] Simple update sync failed:', err);
+          }
+        })();
       }
     }
 

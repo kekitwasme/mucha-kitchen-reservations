@@ -1,6 +1,6 @@
-import { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, StaffRole, AuditAction } from '@prisma/client';
+import { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction } from '@prisma/client';
 
-export { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, StaffRole, AuditAction };
+export { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction };
 
 export interface Restaurant {
   id: string;
@@ -140,7 +140,7 @@ export interface StaffUser {
   id: string;
   restaurantId: string;
   userId: string;
-  role: StaffRole;
+  role: string;
   active: boolean;
   createdAt: Date;
 }

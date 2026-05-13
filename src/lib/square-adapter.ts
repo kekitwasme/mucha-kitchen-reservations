@@ -7,6 +7,72 @@ import { prisma } from './prisma';
  * If Square is down, the reservation still succeeds; we retry later.
  */
 
+/**
+ * Fetch full booking details from Square by booking ID.
+ * Returns the booking object or null if not found / error.
+ */
+export async function fetchSquareBooking(bookingId: string): Promise<{
+  id: string;
+  status?: string;
+  startAt?: string;
+  locationId?: string;
+  customerId?: string;
+  appointmentSegments?: Array<{ durationMinutes?: number; serviceVariationId?: string; teamMemberId?: string }>;
+  sellerNote?: string;
+  customerNote?: string;
+} | null> {
+  try {
+    const { bookings } = squareClient;
+    const response = await bookings.get({ bookingId });
+    const booking = response.booking;
+    if (!booking) return null;
+    return {
+      id: booking.id ?? bookingId,
+      status: booking.status as string | undefined,
+      startAt: booking.startAt as string | undefined,
+      locationId: booking.locationId as string | undefined,
+      customerId: booking.customerId as string | undefined,
+      appointmentSegments: booking.appointmentSegments?.map((seg) => ({
+        durationMinutes: seg.durationMinutes != null ? Number(seg.durationMinutes) : undefined,
+        serviceVariationId: seg.serviceVariationId as string | undefined,
+        teamMemberId: seg.teamMemberId as string | undefined,
+      })),
+      sellerNote: booking.sellerNote as string | undefined,
+      customerNote: booking.customerNote as string | undefined,
+    };
+  } catch (error) {
+    console.error('[Square Adapter] fetchSquareBooking failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch customer details from Square by customer ID.
+ * Returns name, phone, email or null if not found / error.
+ */
+export async function fetchSquareCustomer(customerId: string): Promise<{
+  givenName?: string;
+  familyName?: string;
+  phoneNumber?: string;
+  emailAddress?: string;
+} | null> {
+  try {
+    const { customers } = squareClient;
+    const response = await customers.get({ customerId });
+    const customer = response.customer;
+    if (!customer) return null;
+    return {
+      givenName: customer.givenName as string | undefined,
+      familyName: customer.familyName as string | undefined,
+      phoneNumber: customer.phoneNumber as string | undefined,
+      emailAddress: customer.emailAddress as string | undefined,
+    };
+  } catch (error) {
+    console.error('[Square Adapter] fetchSquareCustomer failed:', error);
+    return null;
+  }
+}
+
 interface CustomerData {
   name: string;
   phone: string;
