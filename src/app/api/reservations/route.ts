@@ -37,6 +37,15 @@ export async function GET(request: NextRequest) {
 
     const { dateFrom, dateTo, status, source, search, tableId, limit, offset } = parsed.data;
 
+    // Build "future reservations" clause: from today onward, active statuses only
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const futureWhere: Record<string, unknown> = {
+      ...(RESTAURANT_ID ? { restaurantId: RESTAURANT_ID } : {}),
+      reservationDate: { gte: today },
+      status: { in: ['pending', 'confirmed', 'seated'] as ReservationStatus[] },
+    };
+
     const where: Record<string, unknown> = {
       ...(RESTAURANT_ID ? { restaurantId: RESTAURANT_ID } : {}),
       ...(dateFrom || dateTo
@@ -73,21 +82,49 @@ export async function GET(request: NextRequest) {
         : {}),
     };
 
-    const [reservations, total] = await Promise.all([
+    // Fetch date-filtered reservations + future active reservations in parallel
+    const reservationSelect = {
+      id: true,
+      customerName: true,
+      customerPhone: true,
+      customerEmail: true,
+      partySize: true,
+      reservationDate: true,
+      startTime: true,
+      endTime: true,
+      status: true,
+      source: true,
+      notes: true,
+      reservationTables: {
+        include: { table: { select: { id: true, name: true } } },
+      },
+    } as const;
+
+    const [reservations, futureReservations, total] = await Promise.all([
       prisma.reservation.findMany({
         where,
-        include: {
-          reservationTables: { include: { table: true } },
-          payments: true,
-        },
-        orderBy: { startTime: 'desc' },
+        select: reservationSelect,
+        orderBy: { startTime: 'asc' },
         take: limit,
         skip: offset,
+      }),
+      prisma.reservation.findMany({
+        where: futureWhere,
+        select: reservationSelect,
+        orderBy: [{ reservationDate: 'asc' }, { startTime: 'asc' }],
+        take: 100,
       }),
       prisma.reservation.count({ where }),
     ]);
 
-    return NextResponse.json({ reservations, total });
+    return NextResponse.json(
+      { reservations, futureReservations, total },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
+        },
+      }
+    );
   } catch (err) {
     console.error('[GET /api/reservations]', err);
     return errorResponse('Failed to fetch reservations', 'INTERNAL_ERROR', 500);

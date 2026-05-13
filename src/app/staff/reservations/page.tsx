@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,12 @@ import {
 } from '@/components/ui/popover';
 import { useReservationListStore } from '@/lib/store';
 import ReservationDetailDrawer from '@/components/reservations/ReservationDetailDrawer';
-import EditReservationModal from '@/components/reservations/EditReservationModal';
+import dynamic from 'next/dynamic';
+
+const EditReservationModal = dynamic(
+  () => import('@/components/reservations/EditReservationModal'),
+  { ssr: false }
+);
 import { format, parseISO } from 'date-fns';
 
 interface Reservation {
@@ -108,16 +113,8 @@ export default function ReservationsPage() {
     },
   });
 
-  // Future reservations: from today onward, excluding cancelled/no_show
-  const today = new Date().toISOString().split('T')[0];
-  const { data: futureData, isLoading: futureLoading } = useQuery({
-    queryKey: ['reservations', 'future', today],
-    queryFn: async () => {
-      const res = await fetch(`/api/reservations?dateFrom=${today}&status=pending,confirmed,seated`);
-      if (!res.ok) throw new Error('Failed to fetch future reservations');
-      return res.json();
-    },
-  });
+  // Future reservations come from the same API response
+  const futureReservations: Reservation[] = (data?.futureReservations || []) as Reservation[];
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -150,7 +147,6 @@ export default function ReservationsPage() {
   });
 
   const reservations: Reservation[] = data?.reservations || [];
-  const futureReservations: Reservation[] = futureData?.reservations || [];
 
   const filtered = reservations.filter((r) => {
     if (store.statusFilter && r.status !== store.statusFilter) return false;
@@ -329,9 +325,7 @@ export default function ReservationsPage() {
       {/* Future Reservations Section */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">Upcoming Reservations</h2>
-        {futureLoading ? (
-          <div className="h-24 bg-slate-100 animate-pulse rounded-lg" />
-        ) : futureReservations.length === 0 ? (
+        {futureReservations.length === 0 ? (
           <div className="border rounded-lg bg-white p-6 text-center text-muted-foreground">
             No upcoming reservations
           </div>

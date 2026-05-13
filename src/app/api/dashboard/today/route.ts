@@ -37,31 +37,43 @@ function getNowInTimezone(timezone: string): Date {
 }
 
 // GET /api/dashboard/today — Today's summary with counts by status + upcoming arrivals (next 2h)
+
+// Simple in-memory cache for restaurant config (timezone rarely changes)
+let cachedRestaurant: { id: string; timezone: string; fetchedAt: number } | null = null;
+const RESTAURANT_CACHE_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getRestaurant() {
+  const restaurantId = process.env.RESTAURANT_ID || '';
+  if (cachedRestaurant && Date.now() - cachedRestaurant.fetchedAt < RESTAURANT_CACHE_MS) {
+    return { id: cachedRestaurant.id, timezone: cachedRestaurant.timezone };
+  }
+  let actualId = restaurantId;
+  let timezone = 'Australia/Perth';
+  if (!actualId) {
+    const restaurant = await prisma.restaurant.findFirst();
+    if (!restaurant) return null;
+    actualId = restaurant.id;
+    timezone = restaurant.timezone || 'Australia/Perth';
+  } else {
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: actualId } });
+    if (restaurant) timezone = restaurant.timezone || 'Australia/Perth';
+  }
+  cachedRestaurant = { id: actualId, timezone, fetchedAt: Date.now() };
+  return { id: actualId, timezone };
+}
+
 export async function GET(_request: NextRequest) {
   try {
-    const restaurantId = process.env.RESTAURANT_ID || '';
-
-    let actualRestaurantId = restaurantId;
-    let restaurantTimezone = 'Australia/Perth';
-
-    if (!actualRestaurantId) {
-      const restaurant = await prisma.restaurant.findFirst();
-      if (!restaurant) {
-        return NextResponse.json({
-          date: new Date().toISOString().split('T')[0],
-          total: 0,
-          byStatus: {} as Record<string, number>,
-          upcomingArrivals: [],
-        });
-      }
-      actualRestaurantId = restaurant.id;
-      restaurantTimezone = restaurant.timezone || 'Australia/Perth';
-    } else {
-      const restaurant = await prisma.restaurant.findUnique({ where: { id: actualRestaurantId } });
-      if (restaurant) {
-        restaurantTimezone = restaurant.timezone || 'Australia/Perth';
-      }
+    const restaurant = await getRestaurant();
+    if (!restaurant) {
+      return NextResponse.json({
+        date: new Date().toISOString().split('T')[0],
+        total: 0,
+        byStatus: {},
+        upcomingArrivals: [],
+      });
     }
+    const { id: actualRestaurantId, timezone: restaurantTimezone } = restaurant;
 
     // Use restaurant's timezone for "today"
     const now = getNowInTimezone(restaurantTimezone);
@@ -108,12 +120,19 @@ export async function GET(_request: NextRequest) {
         status: r.status,
       }));
 
-    return NextResponse.json({
-      date: todayStart.toISOString().split('T')[0],
-      total: reservations.length,
-      byStatus,
-      upcomingArrivals,
-    });
+    return NextResponse.json(
+      {
+        date: todayStart.toISOString().split('T')[0],
+        total: reservations.length,
+        byStatus,
+        upcomingArrivals,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
+        },
+      }
+    );
   } catch (err) {
     console.error('[GET /api/dashboard/today]', err);
     return errorResponse('Failed to fetch dashboard', 'INTERNAL_ERROR', 500);
