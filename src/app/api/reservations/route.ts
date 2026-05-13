@@ -4,7 +4,7 @@ import { createReservationSchema, listReservationsQuerySchema } from '@/lib/sche
 import { getTurnTime, combineDateTime, toDateOnly } from '@/lib/utils';
 import { assignTables } from '@/lib/table-assignment';
 import { createOrFindCustomer, createSquareBooking } from '@/lib/square-adapter';
-import { ReservationStatus } from '@prisma/client';
+import { ReservationStatus, ReservationSource } from '@prisma/client';
 
 const RESTAURANT_ID = process.env.RESTAURANT_ID || '';
 
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
             startTime,
             endTime,
             status: requestedStatus || 'confirmed',
-            source: source || 'online',
+            source: (source || 'online') as ReservationSource,
             notes: notes || null,
           },
         });
