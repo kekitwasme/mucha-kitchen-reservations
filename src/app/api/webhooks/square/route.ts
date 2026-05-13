@@ -260,11 +260,24 @@ export async function POST(request: NextRequest) {
 
     // Verify signature if secret is configured
     if (webhookSecret) {
+      const notificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://restaurant-reservation-two-theta.vercel.app'}/api/webhooks/square`;
       const isValid = await verifySquareWebhookSignature(body, signature, webhookSecret);
       if (!isValid) {
-        console.warn('[Square Webhook] Invalid signature');
+        // Debug: compute expected signature locally for comparison
+        const crypto = await import('crypto');
+        const payload = notificationUrl + body;
+        const expectedSig = crypto.createHmac('sha256', webhookSecret).update(payload, 'utf8').digest('base64');
+        console.warn('[Square Webhook] Invalid signature', {
+          receivedSig: signature,
+          computedSig: expectedSig,
+          notificationUrl,
+          bodyLength: body.length,
+          bodyPreview: body.substring(0, 200),
+          secretLength: webhookSecret.length,
+        });
         return NextResponse.json({ error: 'Invalid signature', code: 'INVALID_SIGNATURE' }, { status: 400 });
       }
+      console.log('[Square Webhook] Signature verified successfully');
     } else {
       console.warn('[Square Webhook] No webhook secret configured, skipping signature verification');
     }
