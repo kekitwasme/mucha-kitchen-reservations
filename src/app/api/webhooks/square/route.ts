@@ -255,12 +255,12 @@ async function findDefaultRestaurant(): Promise<string | null> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
-    const signature = request.headers.get('x-square-signature') || '';
+    const signature = request.headers.get('x-square-hmacsha256-signature') || '';
     const webhookSecret = process.env.SQUARE_WEBHOOK_SECRET || '';
 
     // Verify signature if secret is configured
     if (webhookSecret) {
-      const isValid = verifySquareWebhookSignature(body, signature, webhookSecret);
+      const isValid = await verifySquareWebhookSignature(body, signature, webhookSecret);
       if (!isValid) {
         console.warn('[Square Webhook] Invalid signature');
         return NextResponse.json({ error: 'Invalid signature', code: 'INVALID_SIGNATURE' }, { status: 400 });

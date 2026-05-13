@@ -1,4 +1,4 @@
-import { SquareClient, SquareEnvironment } from 'square';
+import { SquareClient, SquareEnvironment, WebhooksHelper } from 'square';
 
 // Square SDK client singleton
 const globalForSquare = globalThis as unknown as { squareClient: SquareClient };
@@ -24,21 +24,23 @@ if (process.env.NODE_ENV === 'production') {
   globalForSquare.squareClient = squareClient;
 }
 
-// Webhook signature verification helper
-export function verifySquareWebhookSignature(
+// Webhook signature verification using Square SDK
+// Square signs with HMAC-SHA256 using: signatureKey + notificationUrl + requestBody
+export async function verifySquareWebhookSignature(
   body: string,
   signature: string,
-  webhookSecret: string
-): boolean {
+  signatureKey: string
+): Promise<boolean> {
   try {
-    const crypto = require('crypto');
-    const hash = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(body)
-      .digest('base64');
-    return hash === signature;
+    const notificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://restaurant-reservation-two-theta.vercel.app'}/api/webhooks/square`;
+    return await WebhooksHelper.verifySignature({
+      requestBody: body,
+      signatureHeader: signature,
+      signatureKey,
+      notificationUrl,
+    });
   } catch {
-    console.warn('[Square Webhook] Signature verification skipped — missing config');
+    console.warn('[Square Webhook] Signature verification failed');
     return false;
   }
 }
