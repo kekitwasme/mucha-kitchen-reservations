@@ -153,6 +153,10 @@ export async function assignTables(
 
 /**
  * Generate time slots for a date + party size.
+ *
+ * Optimised: fetches all data in 3 queries (reservations, tables, groups)
+ * then computes availability for each slot in memory.
+ * Previously: 3 queries per slot (48+ slots × 3 = 144+ DB round trips).
  */
 export async function generateAvailabilitySlots(
   restaurantId: string,
@@ -160,23 +164,74 @@ export async function generateAvailabilitySlots(
   partySize: number
 ): Promise<{ startTime: string; endTime: string; availableTableIds: string[]; availableTableNames: string[] }[]> {
   const dayOfWeek = date.getDay();
-  const rules = await prisma.availabilityRule.findFirst({
-    where: { restaurantId, dayOfWeek, active: true },
-  });
 
-  if (!rules) return [];
+  // ── Batch fetch: 3 queries total ──────────────────────────────────────
 
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { id: restaurantId },
-    select: { turnTimeRules: true },
-  });
+  const [rules, restaurant, allTables, allGroups, occupiedReservations] = await Promise.all([
+    prisma.availabilityRule.findFirst({
+      where: { restaurantId, dayOfWeek, active: true },
+    }),
+    prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { turnTimeRules: true },
+    }),
+    prisma.table.findMany({
+      where: { restaurantId, active: true },
+      select: { id: true, name: true, capacity: true, minCapacity: true },
+      orderBy: { capacity: 'asc' },
+    }),
+    prisma.tableGroup.findMany({
+      where: { restaurantId, active: true, combinedCapacity: { gte: partySize } },
+      include: { groupMembers: { include: { table: true }, orderBy: { sortOrder: 'asc' } } },
+    }),
+    // All reservations for the day (with a buffer for turn time) in one query
+    prisma.reservation.findMany({
+      where: {
+        restaurantId,
+        status: { notIn: ['cancelled', 'no_show'] },
+        // Fetch the whole service window so we have all overlaps pre-loaded
+        startTime: {
+          gte: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0),
+          lt: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59),
+        },
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        reservationTables: { select: { tableId: true } },
+      },
+    }),
+  ]);
 
-  if (!restaurant) return [];
+  if (!rules || !restaurant) return [];
 
   const turnTime = getTurnTime(partySize, restaurant.turnTimeRules as Record<string, number>);
-
   const startMinutes = parseInt(rules.startTime.split(':')[0]) * 60 + parseInt(rules.startTime.split(':')[1]);
   const endMinutes = parseInt(rules.endTime.split(':')[0]) * 60 + parseInt(rules.endTime.split(':')[1]);
+
+  // ── Build in-memory lookup: tableId → list of (start, end) occupied intervals ──
+
+  const tableOccupancy = new Map<string, { start: Date; end: Date }[]>();
+  for (const res of occupiedReservations) {
+    for (const rt of res.reservationTables) {
+      const intervals = tableOccupancy.get(rt.tableId) || [];
+      intervals.push({ start: res.startTime, end: res.endTime });
+      tableOccupancy.set(rt.tableId, intervals);
+    }
+  }
+
+  /**
+   * Check if a table is free during [slotStart, slotEnd).
+   * A table is occupied if ANY interval overlaps: interval.start < slotEnd && interval.end > slotStart.
+   */
+  function isTableFree(tableId: string, slotStart: Date, slotEnd: Date): boolean {
+    const intervals = tableOccupancy.get(tableId);
+    if (!intervals) return true; // No reservations for this table at all
+    return intervals.every((iv) => iv.start >= slotEnd || iv.end <= slotStart);
+  }
+
+  // ── Compute slots in memory ────────────────────────────────────────────
 
   const slots: { startTime: string; endTime: string; availableTableIds: string[]; availableTableNames: string[] }[] = [];
 
@@ -194,25 +249,17 @@ export async function generateAvailabilitySlots(
     const slotEnd = new Date(date);
     slotEnd.setHours(endH, endMin, 0, 0);
 
-    const { tables: available, occupiedIds } = await findAvailableTables(restaurantId, slotStart, slotEnd);
+    // Find fitting individual tables
+    const fitting = allTables.filter(
+      (t) => t.capacity >= partySize && t.minCapacity <= partySize && isTableFree(t.id, slotStart, slotEnd)
+    );
 
-    const fitting = available.filter((t) => t.capacity >= partySize);
-
-    // Also check table groups for larger parties
+    // If no single table fits, check table groups
     const availableGroups: AvailableGroup[] = [];
     if (fitting.length === 0) {
-      const groups = await prisma.tableGroup.findMany({
-        where: {
-          restaurantId,
-          active: true,
-          combinedCapacity: { gte: partySize },
-        },
-        include: { groupMembers: { include: { table: true }, orderBy: { sortOrder: 'asc' } } },
-      });
-
-      for (const group of groups) {
+      for (const group of allGroups) {
         const allAvailable = group.groupMembers.every(
-          (m) => !occupiedIds.includes(m.table.id) && m.table.active
+          (m) => m.table.active && isTableFree(m.table.id, slotStart, slotEnd)
         );
         if (allAvailable) {
           availableGroups.push({
