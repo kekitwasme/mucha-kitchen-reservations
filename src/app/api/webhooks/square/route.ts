@@ -24,11 +24,25 @@ interface SquareBookingData {
   customer_note?: string;
 }
 
+interface SquareWebhookData {
+  type: string;
+  id: string;
+  object: {
+    booking?: SquareBookingData;
+    payment?: SquarePaymentData;
+  };
+}
+
+interface SquarePaymentData {
+  id: string;
+  status?: string;
+}
+
 interface SquareWebhookEvent {
   type: string;
   event_id: string;
   created_at: string;
-  data: SquareBookingData;
+  data: SquareWebhookData;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -260,24 +274,14 @@ export async function POST(request: NextRequest) {
 
     // Verify signature if secret is configured
     if (webhookSecret) {
-      const notificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://restaurant-reservation-two-theta.vercel.app'}/api/webhooks/square`;
       const isValid = await verifySquareWebhookSignature(body, signature, webhookSecret);
       if (!isValid) {
-        // Debug: compute expected signature locally for comparison
-        const crypto = await import('crypto');
-        const payload = notificationUrl + body;
-        const expectedSig = crypto.createHmac('sha256', webhookSecret).update(payload, 'utf8').digest('base64');
         console.warn('[Square Webhook] Invalid signature', {
-          receivedSig: signature,
-          computedSig: expectedSig,
-          notificationUrl,
+          receivedSig: signature.substring(0, 20) + '...',
           bodyLength: body.length,
-          bodyPreview: body.substring(0, 200),
-          secretLength: webhookSecret.length,
         });
         return NextResponse.json({ error: 'Invalid signature', code: 'INVALID_SIGNATURE' }, { status: 400 });
       }
-      console.log('[Square Webhook] Signature verified successfully');
     } else {
       console.warn('[Square Webhook] No webhook secret configured, skipping signature verification');
     }
@@ -297,49 +301,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const data = event.data;
+    // Extract booking data from nested Square structure
+    const bookingData: SquareBookingData | undefined = event.data?.object?.booking;
+    const paymentData: SquarePaymentData | undefined = event.data?.object?.payment;
+
+    if (!bookingData && !paymentData) {
+      console.warn(`[Square Webhook] No booking or payment data in event ${eventId}`);
+      return NextResponse.json({ received: true });
+    }
 
     // ── booking.created ──────────────────────────────────────────────────
-    if (eventType === 'booking.created') {
-      const result = await handleBookingCreated(eventId, data);
+    if (eventType === 'booking.created' && bookingData) {
+      const result = await handleBookingCreated(eventId, bookingData);
       if (result) {
         await recordEventProcessed(eventId, eventType);
       }
       return NextResponse.json({ received: true });
     }
 
-    // ── booking.updated (enhanced) ────────────────────────────────────────
-    if (eventType === 'booking.updated') {
-      const result = await handleBookingUpdated(eventId, data);
+    // ── booking.updated (enhanced) ────────────────────────────────────────────
+    if (eventType === 'booking.updated' && bookingData) {
+      const result = await handleBookingUpdated(eventId, bookingData);
       if (result) {
         await recordEventProcessed(eventId, eventType);
       }
       return NextResponse.json({ received: true });
     }
 
-    // ── booking.cancelled ────────────────────────────────────────────────
-    if (eventType === 'booking.cancelled') {
-      const result = await handleBookingCancelled(eventId, data);
+    // ── booking.cancelled ────────────────────────────────────────────────────
+    if (eventType === 'booking.cancelled' && bookingData) {
+      const result = await handleBookingCancelled(eventId, bookingData);
       if (result) {
         await recordEventProcessed(eventId, eventType);
       }
       return NextResponse.json({ received: true });
     }
 
-    // ── booking.deleted ────────────────────────────────────────────────
+    // ── booking.deleted ────────────────────────────────────────────────────
     // Square sends booking.deleted when a booking is hard-deleted.
     // Treat the same as cancelled — mark local reservation as cancelled.
-    if (eventType === 'booking.deleted') {
-      const result = await handleBookingCancelled(eventId, data);
+    if (eventType === 'booking.deleted' && bookingData) {
+      const result = await handleBookingCancelled(eventId, bookingData);
       if (result) {
         await recordEventProcessed(eventId, eventType);
       }
       return NextResponse.json({ received: true });
     }
 
-    // ── payment.updated (unchanged) ──────────────────────────────────────
-    if (eventType === 'payment.updated') {
-      await handlePaymentUpdated(eventId, data);
+    // ── payment.updated (unchanged) ──────────────────────────────────────────
+    if (eventType === 'payment.updated' && paymentData) {
+      await handlePaymentUpdated(eventId, paymentData);
       await recordEventProcessed(eventId, eventType);
       return NextResponse.json({ received: true });
     }
@@ -681,7 +692,7 @@ async function handleBookingCancelled(eventId: string, data: SquareBookingData):
 /**
  * Handle payment.updated — update payment status (unchanged logic).
  */
-async function handlePaymentUpdated(eventId: string, data: SquareBookingData): Promise<void> {
+async function handlePaymentUpdated(eventId: string, data: SquarePaymentData): Promise<void> {
   const squarePaymentId = data.id;
   const paymentStatus = data.status;
 
