@@ -16,6 +16,17 @@ import { Separator } from '@/components/ui/separator';
 import { format, parseISO } from 'date-fns';
 import EditReservationModal from '@/components/reservations/EditReservationModal';
 import StaffNoteInput from '@/components/reservations/StaffNoteInput';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 // ── Status config ──────────────────────────────────────────────
 
@@ -95,6 +106,7 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
   const [tableError, setTableError] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Fetch reservation detail
   const {
@@ -259,24 +271,73 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
                 Reservation details for {detail.customerName}
               </DrawerDescription>
               {/* Status action buttons */}
-              {statusTransitions[detail.status]?.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {statusTransitions[detail.status].map((t) => (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {statusTransitions[detail.status]?.map((t) => (
+                  <Button
+                    key={t.status}
+                    size="sm"
+                    variant={t.variant === 'destructive' ? 'outline' : t.variant}
+                    className={t.variant === 'destructive' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}
+                    disabled={statusMutation.isPending}
+                    onClick={() =>
+                      statusMutation.mutate({ id: detail.id, status: t.status })
+                    }
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+
+                {/* Delete button */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
                     <Button
-                      key={t.status}
                       size="sm"
-                      variant={t.variant === 'destructive' ? 'outline' : t.variant}
-                      className={t.variant === 'destructive' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}
-                      disabled={statusMutation.isPending}
-                      onClick={() =>
-                        statusMutation.mutate({ id: detail.id, status: t.status })
-                      }
+                      variant="outline"
+                      className="ml-auto text-red-600 border-red-200 hover:bg-red-50"
                     >
-                      {t.label}
+                      Delete
                     </Button>
-                  ))}
-                </div>
-              )}
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Reservation</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete this reservation for {detail.customerName}.
+                        This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {deleteError && (
+                      <p className="text-sm text-red-600">{deleteError}</p>
+                    )}
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={async () => {
+                          setDeleteError(null);
+                          try {
+                            const res = await fetch(`/api/reservations/${detail.id}?hard=true`, {
+                              method: 'DELETE',
+                            });
+                            if (!res.ok) {
+                              const err = await res.json().catch(() => ({}));
+                              setDeleteError(err.error || 'Failed to delete');
+                              return;
+                            }
+                            queryClient.invalidateQueries({ queryKey: ['reservations'] });
+                            queryClient.invalidateQueries({ queryKey: ['walkIns'] });
+                            onClose();
+                          } catch {
+                            setDeleteError('Network error');
+                          }
+                        }}
+                      >
+                        Delete Permanently
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </DrawerHeader>
 
             {/* Details Grid */}

@@ -16,9 +16,12 @@ function errorResponse(error: string, code: string, status: number, details?: un
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+
+    // Support `date` as shorthand for dateFrom=dateTo (same day filter)
+    const dateParam = searchParams.get('date');
     const rawParams: Record<string, string | undefined> = {
-      dateFrom: searchParams.get('dateFrom') ?? undefined,
-      dateTo: searchParams.get('dateTo') ?? undefined,
+      dateFrom: searchParams.get('dateFrom') ?? (dateParam ?? undefined),
+      dateTo: searchParams.get('dateTo') ?? (dateParam ?? undefined),
       status: searchParams.get('status') ?? undefined,
       source: searchParams.get('source') ?? undefined,
       search: searchParams.get('search') ?? undefined,

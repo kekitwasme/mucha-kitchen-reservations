@@ -279,31 +279,51 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/reservations/[id] — Cancel reservation
+// DELETE /api/reservations/[id] — Cancel or hard-delete reservation
+// ?hard=true — permanently delete the record (use with caution)
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // TODO: Add auth check — staff/admin or owner
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const hardDelete = searchParams.get('hard') === 'true';
 
     const existing = await prisma.reservation.findUnique({ where: { id } });
     if (!existing) {
       return errorResponse('Reservation not found', 'NOT_FOUND', 404);
     }
 
+    if (hardDelete) {
+      // Permanently delete reservation and all related records
+      await prisma.$transaction(async (tx) => {
+        await tx.reservationTable.deleteMany({ where: { reservationId: id } });
+        await tx.auditLog.deleteMany({ where: { reservationId: id } });
+        await tx.payment.deleteMany({ where: { reservationId: id } });
+        await tx.reservation.delete({ where: { id } });
+      });
+
+      // Cancel on Square first if booking exists
+      if (existing.squareBookingId) {
+        cancelSquareBooking(existing.squareBookingId).catch((err) => {
+          console.error('[Square Sync] Cancel booking failed:', err);
+        });
+      }
+
+      return NextResponse.json({ success: true, deleted: true });
+    }
+
+    // Default: soft-cancel
     if (existing.status === 'cancelled') {
       return errorResponse('Reservation is already cancelled', 'ALREADY_CANCELLED', 400);
     }
 
-    // Update status to cancelled
     await prisma.reservation.update({
       where: { id },
       data: { status: 'cancelled' },
     });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         restaurantId: existing.restaurantId,
@@ -324,9 +344,9 @@ export async function DELETE(
       })();
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, cancelled: true });
   } catch (err) {
     console.error('[DELETE /api/reservations/[id]]', err);
-    return errorResponse('Failed to cancel reservation', 'INTERNAL_ERROR', 500);
+    return errorResponse('Failed to delete reservation', 'INTERNAL_ERROR', 500);
   }
 }

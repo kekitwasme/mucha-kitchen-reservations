@@ -81,9 +81,15 @@ const dropdownActions: Record<string, ActionItem[]> = {
     { label: 'Reassign Table', status: '__reassign__', variant: 'outline' },
     { label: 'Add Note', status: '__note__', variant: 'outline' },
   ],
-  completed: [],
-  cancelled: [],
-  no_show: [],
+  completed: [
+    { label: 'Delete', status: '__delete__', variant: 'destructive' },
+  ],
+  cancelled: [
+    { label: 'Delete', status: '__delete__', variant: 'destructive' },
+  ],
+  no_show: [
+    { label: 'Delete', status: '__delete__', variant: 'destructive' },
+  ],
 };
 
 // ── Component ──────────────────────────────────────────────────
@@ -117,6 +123,21 @@ export default function ReservationsPage() {
     },
   });
 
+  const deleteReservation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/reservations/${id}?hard=true`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      if (store.selectedReservationId) store.setSelectedReservationId(null);
+    },
+  });
+
   const reservations: Reservation[] = data?.reservations || [];
 
   const filtered = reservations.filter((r) => {
@@ -142,6 +163,12 @@ export default function ReservationsPage() {
     }
     if (action.status === '__note__') {
       store.setSelectedReservationId(reservationId);
+      return;
+    }
+    if (action.status === '__delete__') {
+      if (confirm('Delete this reservation permanently? This cannot be undone.')) {
+        deleteReservation.mutate(reservationId);
+      }
       return;
     }
     updateStatus.mutate({ id: reservationId, status: action.status });
