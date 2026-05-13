@@ -19,9 +19,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useReservationListStore } from '@/lib/store';
-import ReservationDetailDrawer from '@/components/reservations/ReservationDetailDrawer';
 import dynamic from 'next/dynamic';
 
+const ReservationDetailDrawer = dynamic(
+  () => import('@/components/reservations/ReservationDetailDrawer'),
+  { ssr: false }
+);
 const EditReservationModal = dynamic(
   () => import('@/components/reservations/EditReservationModal'),
   { ssr: false }

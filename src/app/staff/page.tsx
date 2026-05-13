@@ -100,23 +100,12 @@ export default function StaffDashboardPage() {
   const queryClient = useQueryClient();
   const store = useReservationListStore();
 
-  // Fetch today's summary
-  const { data: today, isLoading: loadingToday } = useQuery<TodaySummary>({
-    queryKey: ['dashboard', 'today'],
+  // Fetch dashboard data (today summary + upcoming arrivals) in a single API call
+  const { data: dashboard, isLoading } = useQuery<TodaySummary>({
+    queryKey: ['dashboard'],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/today');
-      if (!res.ok) throw new Error('Failed to fetch today summary');
-      return res.json();
-    },
-    refetchInterval: 30000,
-  });
-
-  // Fetch upcoming arrivals (next 2h)
-  const { data: upcoming, isLoading: loadingUpcoming } = useQuery<{ arrivals: Arrival[] }>({
-    queryKey: ['dashboard', 'upcoming'],
-    queryFn: async () => {
-      const res = await fetch('/api/dashboard/upcoming');
-      if (!res.ok) throw new Error('Failed to fetch upcoming arrivals');
+      const res = await fetch('/api/dashboard');
+      if (!res.ok) throw new Error('Failed to fetch dashboard');
       return res.json();
     },
     refetchInterval: 30000,
@@ -145,13 +134,13 @@ export default function StaffDashboardPage() {
   };
 
   // Format date nicely
-  const formattedDate = today?.date
-    ? format(parseISO(today.date + 'T00:00:00'), 'EEEE, d MMMM yyyy')
+  const formattedDate = dashboard?.date
+    ? format(parseISO(dashboard.date + 'T00:00:00'), 'EEEE, d MMMM yyyy')
     : '';
 
-  const byStatus = today?.byStatus ?? {};
-  const total = today?.total ?? 0;
-  const arrivals = upcoming?.arrivals ?? [];
+  const byStatus = dashboard?.byStatus ?? {};
+  const total = dashboard?.total ?? 0;
+  const arrivals = dashboard?.upcomingArrivals ?? [];
 
   // Combine cancelled + no_show counts for the red card
   const cancelledOrNoShow =
@@ -162,7 +151,7 @@ export default function StaffDashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        {loadingToday ? (
+        {isLoading ? (
           <Skeleton className="h-5 w-48 mt-1" />
         ) : (
           <p className="text-muted-foreground mt-1">{formattedDate}</p>
@@ -172,7 +161,7 @@ export default function StaffDashboardPage() {
       {/* Status Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total card */}
-        {loadingToday ? (
+        {isLoading ? (
           <>
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-24 rounded-xl" />
@@ -233,7 +222,7 @@ export default function StaffDashboardPage() {
       {/* Upcoming Arrivals Panel */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Upcoming Arrivals</h2>
-        {loadingUpcoming ? (
+        {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
