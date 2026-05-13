@@ -96,7 +96,7 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b p-4 flex items-center gap-4">
+        <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -105,7 +105,7 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
           >
             <span className="text-xl">☰</span>
           </Button>
-          <h2 className="text-lg font-semibold">Staff Dashboard</h2>
+          <h2 className="text-lg font-semibold">Mucha Kitchen</h2>
         </header>
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
