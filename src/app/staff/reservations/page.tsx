@@ -108,6 +108,17 @@ export default function ReservationsPage() {
     },
   });
 
+  // Future reservations: from today onward, excluding cancelled/no_show
+  const today = new Date().toISOString().split('T')[0];
+  const { data: futureData, isLoading: futureLoading } = useQuery({
+    queryKey: ['reservations', 'future', today],
+    queryFn: async () => {
+      const res = await fetch(`/api/reservations?dateFrom=${today}&status=pending,confirmed,seated`);
+      if (!res.ok) throw new Error('Failed to fetch future reservations');
+      return res.json();
+    },
+  });
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await fetch(`/api/reservations/${id}`, {
@@ -139,6 +150,7 @@ export default function ReservationsPage() {
   });
 
   const reservations: Reservation[] = data?.reservations || [];
+  const futureReservations: Reservation[] = futureData?.reservations || [];
 
   const filtered = reservations.filter((r) => {
     if (store.statusFilter && r.status !== store.statusFilter) return false;
@@ -313,6 +325,109 @@ export default function ReservationsPage() {
           </Table>
         </div>
       )}
+
+      {/* Future Reservations Section */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">Upcoming Reservations</h2>
+        {futureLoading ? (
+          <div className="h-24 bg-slate-100 animate-pulse rounded-lg" />
+        ) : futureReservations.length === 0 ? (
+          <div className="border rounded-lg bg-white p-6 text-center text-muted-foreground">
+            No upcoming reservations
+          </div>
+        ) : (
+          <div className="border rounded-lg bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Party</TableHead>
+                  <TableHead>Tables</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {futureReservations.map((r) => {
+                  const primary = primaryActions[r.status];
+                  const actions = dropdownActions[r.status] || [];
+
+                  return (
+                    <TableRow
+                      key={r.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => store.setSelectedReservationId(r.id)}
+                    >
+                      <TableCell className="text-muted-foreground">
+                        {format(parseISO(r.startTime), 'EEE d MMM')}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {format(parseISO(r.startTime), 'HH:mm')}
+                      </TableCell>
+                      <TableCell>{r.customerName}</TableCell>
+                      <TableCell>{r.partySize}</TableCell>
+                      <TableCell>
+                        {r.reservationTables.map((rt) => rt.table.name).join(', ') || '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={statusColors[r.status] || 'bg-gray-100'}
+                        >
+                          {r.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div
+                          className="flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {primary && (
+                            <Button
+                              size="sm"
+                              variant={primary.variant === 'default' ? 'default' : 'outline'}
+                              onClick={() => handleAction(r.id, primary)}
+                              disabled={updateStatus.isPending}
+                            >
+                              {primary.label}
+                            </Button>
+                          )}
+                          {actions.length > 0 && (
+                            <Popover>
+                              <PopoverTrigger render={<button type="button" className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground">⋮</button>}>
+                              </PopoverTrigger>
+                              <PopoverContent align="end" side="bottom" className="w-44 p-1">
+                                <div className="flex flex-col gap-0.5">
+                                  {actions.map((action) => (
+                                    <button
+                                      key={action.label}
+                                      type="button"
+                                      className={`flex w-full items-center rounded-md px-3 py-1.5 text-sm text-left transition-colors ${
+                                        action.variant === 'destructive'
+                                          ? 'text-red-600 hover:bg-red-50'
+                                          : 'hover:bg-accent'
+                                      }`}
+                                      onClick={() => handleAction(r.id, action)}
+                                    >
+                                      {action.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       {/* Reservation Detail Drawer */}
       <ReservationDetailDrawer
