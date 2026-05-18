@@ -1,9 +1,26 @@
+/**
+ * Mucha Kitchen — Zod Validation Schemas
+ * ======================================
+ *
+ * Centralised request/response validation schemas for all API routes.
+ * Every endpoint validates input against these schemas before processing.
+ *
+ * Enums mirror Prisma schema values to keep client and server aligned.
+ *
+ * @module schemas
+ * @see https://zod.dev/
+ */
 import { z } from 'zod';
 
 // ─── Enums ──────────────────────────────────────────────────────
 
+/** Table shape options: square (standard) or booth (bench-style). */
 export const TableShapeEnum = z.enum(['square', 'booth']);
+
+/** Seating area options within the restaurant. */
 export const TableAreaEnum = z.enum(['indoor', 'outdoor', 'bar', 'private_room']);
+
+/** Reservation lifecycle states. */
 export const ReservationStatusEnum = z.enum([
   'pending',
   'confirmed',
@@ -13,12 +30,18 @@ export const ReservationStatusEnum = z.enum([
   'no_show',
 ]);
 
+/** How the reservation was created (online widget, walk-in, phone, Square sync). */
 export const ReservationSourceEnum = z.enum(['online', 'walk_in', 'phone', 'square']);
+
+/** Payment lifecycle states. */
 export const PaymentStatusEnum = z.enum(['pending', 'completed', 'failed', 'refunded']);
+
+/** Types of financial transactions associated with a reservation. */
 export const PaymentTypeEnum = z.enum(['deposit', 'per_person_deposit', 'no_show_fee', 'full_prepayment']);
 
 // ─── Tables ─────────────────────────────────────────────────────
 
+/** Query parameters for GET /api/tables — filter by area and active flag. */
 export const getTablesQuerySchema = z.object({
   area: TableAreaEnum.optional(),
   active: z
@@ -28,6 +51,7 @@ export const getTablesQuerySchema = z.object({
     .default(true),
 });
 
+/** Body schema for POST /api/tables — create a new table. */
 export const createTableSchema = z.object({
   name: z.string().min(1).max(20),
   capacity: z.number().min(1).max(50),
@@ -41,6 +65,7 @@ export const createTableSchema = z.object({
   rotation: z.number().optional().default(0),
 });
 
+/** Body schema for PATCH /api/tables/[id] — update an existing table. */
 export const updateTableSchema = z.object({
   name: z.string().min(1).max(20).optional(),
   capacity: z.number().min(1).max(50).optional(),
@@ -57,23 +82,25 @@ export const updateTableSchema = z.object({
 
 // ─── Reservations ───────────────────────────────────────────────
 
+/** Body schema for POST /api/reservations — customer creates a booking. */
 export const createReservationSchema = z.object({
   customerName: z.string().min(1).max(100),
   customerPhone: z.string().min(5).max(20),
   customerEmail: z.string().email().optional(),
   partySize: z.number().min(1).max(12),
-  reservationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  reservationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),            // HH:MM
   notes: z.string().max(500).optional(),
   preferredTableIds: z.array(z.string()).optional(),
   source: ReservationSourceEnum.optional().default('online'),
   status: ReservationStatusEnum.optional(), // walk-ins may pass 'seated' or 'pending'
 });
 
+/** Query parameters for GET /api/reservations — list with filters. */
 export const listReservationsQuerySchema = z.object({
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date').optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date').optional(),
-  status: z.string().optional(), // comma-separated
+  status: z.string().optional(), // comma-separated list of statuses
   source: ReservationSourceEnum.optional(),
   search: z.string().optional(),
   tableId: z.string().optional(),
@@ -81,6 +108,7 @@ export const listReservationsQuerySchema = z.object({
   offset: z.coerce.number().min(0).optional().default(0),
 });
 
+/** Body schema for PATCH /api/reservations/[id] — edit a reservation. */
 export const updateReservationSchema = z.object({
   customerName: z.string().min(1).max(100).optional(),
   customerPhone: z.string().min(5).max(20).optional(),
@@ -96,19 +124,20 @@ export const updateReservationSchema = z.object({
 
 // ─── Availability ────────────────────────────────────────────────
 
+/** Query parameters for GET /api/availability — check open slots for a date + party size. */
 export const availabilityQuerySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
   partySize: z.coerce.number().min(1).max(12),
 });
 
 // ─── Dashboard ──────────────────────────────────────────────────
 
-// No query params needed for today/upcoming
+// Dashboard endpoints (GET /api/dashboard, GET /api/dashboard/today, etc.)
+// have no query parameters — they derive context from the authenticated session.
 
 // ─── Square Webhook ─────────────────────────────────────────────
 
-// Webhook body is untyped; we just parse known fields
-
+/** Body schema for Square webhook events. Fields vary by event type. */
 export const squareWebhookEventSchema = z.object({
   type: z.string(),
   event_id: z.string().optional(),
@@ -117,6 +146,7 @@ export const squareWebhookEventSchema = z.object({
 
 // ─── Admin Settings ─────────────────────────────────────────────
 
+/** Body schema for PATCH /api/admin/settings — update restaurant configuration. */
 export const updateSettingsSchema = z.object({
   name: z.string().optional(),
   address: z.string().optional().nullable(),

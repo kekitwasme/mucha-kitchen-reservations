@@ -1,3 +1,17 @@
+/**
+ * Mucha Kitchen — Table Assignment Engine
+ * ========================================
+ *
+ * Core logic for finding available tables, assigning optimal tables to reservations,
+ * and generating time-slot availability for the booking widget.
+ *
+ * Key algorithms:
+ * - `findAvailableTables`: overlap detection using Prisma query + in-memory filter
+ * - `assignTables`: greedy assignment (exact match → smallest wasted seats → table groups)
+ * - `generateAvailabilitySlots`: batched 3-query approach (was 144+ queries before optimisation)
+ *
+ * @module table-assignment
+ */
 import { prisma } from './prisma';
 import { getTurnTime } from './utils';
 

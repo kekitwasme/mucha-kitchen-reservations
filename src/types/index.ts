@@ -1,3 +1,15 @@
+/**
+ * Mucha Kitchen — TypeScript Domain Types
+ * ========================================
+ *
+ * Application-level types that extend or mirror Prisma-generated types.
+ * Used across API routes, components, and utility functions.
+ *
+ * These types are kept in sync with the Prisma schema manually.
+ * If the schema changes, update this file accordingly.
+ *
+ * @module types
+ */
 import { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction } from '@prisma/client';
 
 export { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction };

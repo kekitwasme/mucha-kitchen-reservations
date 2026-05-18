@@ -1,3 +1,22 @@
+/**
+ * Mucha Kitchen — Square Webhook Receiver
+ * ========================================
+ *
+ * POST /api/webhooks/square
+ *
+ * Handles inbound events from Square Online Booking:
+ * - `booking.created` → Create reservation in our system
+ * - `booking.updated` → Update existing reservation
+ * - `booking.cancelled` → Cancel reservation
+ *
+ * Signature verification uses Square SDK's HMAC-SHA256 check.
+ * Events are processed idempotently (checked by `event_id` in webhook logs).
+ *
+ * Square is treated as an external sync layer — our database is canonical.
+ *
+ * @module api/webhooks/square
+ * @see https://developer.squareup.com/docs/webhooks/overview
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySquareWebhookSignature } from '@/lib/square';
 import { prisma } from '@/lib/prisma';

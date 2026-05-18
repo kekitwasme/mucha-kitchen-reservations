@@ -1,3 +1,15 @@
+/**
+ * Mucha Kitchen — Availability API
+ * ==================================
+ *
+ * GET /api/availability?date=YYYY-MM-DD&partySize=N
+ *
+ * Returns all available time slots for a given date and party size.
+ * Uses the optimised `generateAvailabilitySlots` (3 DB queries total).
+ *
+ * @module api/availability
+ * @see {@link ../../lib/table-assignment.ts} — slot generation engine
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { availabilityQuerySchema } from '@/lib/schemas';
 import { generateAvailabilitySlots } from '@/lib/table-assignment';

@@ -1,3 +1,19 @@
+/**
+ * Mucha Kitchen — Reservations API
+ * =================================
+ *
+ * POST /api/reservations      → Create a new reservation (public, customer booking)
+ * GET  /api/reservations      → List reservations with filters (staff only)
+ *
+ * Business logic:
+ * - Validates input via Zod schemas
+ * - Auto-assigns optimal tables using greedy algorithm
+ * - Syncs to Square best-effort (non-blocking)
+ * - Returns full reservation with assigned table names
+ *
+ * @module api/reservations
+ * @see {@link ../[id]/route.ts} — individual reservation CRUD
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createReservationSchema, listReservationsQuerySchema } from '@/lib/schemas';

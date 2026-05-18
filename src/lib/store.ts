@@ -1,5 +1,18 @@
+/**
+ * Mucha Kitchen — Zustand State Stores
+ * =====================================
+ *
+ * Global client-side state management using Zustand.
+ * One store per domain: booking flow, floor plan, reservation list, sidebar.
+ *
+ * @module store
+ * @see https://docs.pmnd.rs/zustand
+ */
 import { create } from 'zustand';
 
+// ─── Booking Flow ───────────────────────────────────────────────
+
+/** Steps in the customer booking wizard. */
 export type BookingStep = 'date' | 'party' | 'time' | 'details';
 
 interface BookingState {
@@ -21,6 +34,7 @@ const initialBookingState = {
   selectedTime: null,
 };
 
+/** Manages the customer booking wizard state (step, date, party size, time slot). */
 export const useBookingStore = create<BookingState>((set) => ({
   ...initialBookingState,
   setStep: (step) => set({ step }),
@@ -29,6 +43,8 @@ export const useBookingStore = create<BookingState>((set) => ({
   setSelectedTime: (selectedTime) => set({ selectedTime, step: 'details' }),
   reset: () => set(initialBookingState),
 }));
+
+// ─── Floor Plan ─────────────────────────────────────────────────
 
 interface FloorPlanState {
   selectedDate: Date;
@@ -46,6 +62,13 @@ interface FloorPlanState {
   setViewMode: (mode: 'live' | 'preview') => void;
 }
 
+/**
+ * Manages the interactive floor plan state:
+ * - selectedDate / selectedTime: what snapshot of table occupancy to display
+ * - zoom: canvas zoom level (clamped 0.3–3.0)
+ * - isEditMode: whether the user can drag/resize tables
+ * - viewMode: 'live' (real-time) or 'preview' (future date/time simulation)
+ */
 export const useFloorPlanStore = create<FloorPlanState>((set) => ({
   selectedDate: new Date(),
   selectedTime: '18:00',
@@ -62,6 +85,8 @@ export const useFloorPlanStore = create<FloorPlanState>((set) => ({
   setViewMode: (viewMode) => set({ viewMode }),
 }));
 
+// ─── Reservation List ───────────────────────────────────────────
+
 interface ReservationListState {
   dateFilter: string;
   todayDate: string;
@@ -76,6 +101,10 @@ interface ReservationListState {
 
 const todayDateStr = new Date().toISOString().split('T')[0];
 
+/**
+ * Manages the staff reservation list filters and selection state.
+ * Defaults to today's date; staff can filter by date, status, or search text.
+ */
 export const useReservationListStore = create<ReservationListState>((set) => ({
   dateFilter: todayDateStr,
   todayDate: todayDateStr,
@@ -88,6 +117,8 @@ export const useReservationListStore = create<ReservationListState>((set) => ({
   setSelectedReservationId: (selectedReservationId) => set({ selectedReservationId }),
 }));
 
+// ─── Sidebar ────────────────────────────────────────────────────
+
 interface SidebarState {
   isOpen: boolean;
   toggle: () => void;
@@ -95,6 +126,7 @@ interface SidebarState {
   open: () => void;
 }
 
+/** Controls the collapsible sidebar on mobile/desktop staff pages. */
 export const useSidebarStore = create<SidebarState>((set) => ({
   isOpen: false,
   toggle: () => set((s) => ({ isOpen: !s.isOpen })),

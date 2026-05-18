@@ -1,3 +1,17 @@
+/**
+ * Mucha Kitchen — Dashboard API
+ * =============================
+ *
+ * GET /api/dashboard
+ *
+ * Returns today's summary stats and upcoming arrivals for the staff dashboard.
+ * Combines what were previously 2 separate API calls (today + upcoming).
+ *
+ * Response shape:
+ *   { date: string, total: number, byStatus: {...}, upcomingArrivals: [...] }
+ *
+ * @module api/dashboard
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ReservationStatus } from '@prisma/client';
