@@ -40,17 +40,14 @@ jobs:
 
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main'
-        uses: vercel/actions/cli@v1
-        with:
-          vercel_token: ${{ secrets.VERCEL_TOKEN }}
-          vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel_args: '--prod'
+        run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy to Vercel (Preview)
         if: github.event_name == 'pull_request'
-        uses: vercel/actions/cli@v1
-        with:
-          vercel_token: ${{ secrets.VERCEL_TOKEN }}
-          vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
