@@ -30,6 +30,12 @@ export async function GET(
       return errorResponse('Reservation not found', 'NOT_FOUND', 404);
     }
 
+    // Fetch restaurant info for calendar events
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: reservation.restaurantId },
+      select: { name: true, address: true, phone: true },
+    });
+
     const result = {
       ...reservation,
       reservationDate: reservation.reservationDate.toISOString().split('T')[0],
@@ -40,6 +46,7 @@ export async function GET(
       tables: reservation.reservationTables.map((rt) => rt.table),
       tableIds: reservation.reservationTables.map((rt) => rt.tableId),
       tableNames: reservation.reservationTables.map((rt) => rt.table.name),
+      restaurant: restaurant ? { name: restaurant.name, address: restaurant.address, phone: restaurant.phone } : null,
     };
 
     return NextResponse.json({ reservation: result });

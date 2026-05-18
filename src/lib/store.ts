@@ -64,6 +64,7 @@ export const useFloorPlanStore = create<FloorPlanState>((set) => ({
 
 interface ReservationListState {
   dateFilter: string;
+  todayDate: string;
   statusFilter: string;
   searchQuery: string;
   selectedReservationId: string | null;
@@ -73,8 +74,11 @@ interface ReservationListState {
   setSelectedReservationId: (id: string | null) => void;
 }
 
+const todayDateStr = new Date().toISOString().split('T')[0];
+
 export const useReservationListStore = create<ReservationListState>((set) => ({
-  dateFilter: new Date().toISOString().split('T')[0],
+  dateFilter: todayDateStr,
+  todayDate: todayDateStr,
   statusFilter: '',
   searchQuery: '',
   selectedReservationId: null,

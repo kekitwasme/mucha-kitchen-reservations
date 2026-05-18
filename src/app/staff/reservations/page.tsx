@@ -67,7 +67,7 @@ const primaryActions: Record<string, ActionItem | null> = {
   confirmed: { label: 'Seat', status: 'seated', variant: 'default' },
   seated: { label: 'Complete', status: 'completed', variant: 'default' },
   completed: null,
-  cancelled: null,
+  cancelled: { label: 'Delete', status: '__delete__', variant: 'destructive' },
   no_show: null,
 };
 
@@ -92,9 +92,7 @@ const dropdownActions: Record<string, ActionItem[]> = {
   completed: [
     { label: 'Delete', status: '__delete__', variant: 'destructive' },
   ],
-  cancelled: [
-    { label: 'Delete', status: '__delete__', variant: 'destructive' },
-  ],
+  cancelled: [],
   no_show: [
     { label: 'Delete', status: '__delete__', variant: 'destructive' },
   ],
@@ -110,7 +108,9 @@ export default function ReservationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['reservations', store.dateFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/reservations?date=${store.dateFilter}`);
+      const params = new URLSearchParams();
+      if (store.dateFilter) params.set('date', store.dateFilter);
+      const res = await fetch(`/api/reservations?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch reservations');
       return res.json();
     },
@@ -189,30 +189,60 @@ export default function ReservationsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">Date:</label>
-          <Input
-            type="date"
-            value={store.dateFilter}
-            onChange={(e) => store.setDateFilter(e.target.value)}
-            className="w-40"
-          />
+          <Button
+            size="sm"
+            variant={store.dateFilter === store.todayDate ? 'default' : store.dateFilter === '' ? 'secondary' : 'outline'}
+            onClick={() => {
+              if (store.dateFilter === store.todayDate) {
+                store.setDateFilter('');
+              } else {
+                store.setDateFilter(store.todayDate);
+              }
+            }}
+          >
+            Today
+          </Button>
+          <Button
+            size="sm"
+            variant={store.dateFilter && store.dateFilter !== store.todayDate ? 'default' : 'outline'}
+            onClick={() => {
+              const dateInput = document.getElementById('date-filter-input') as HTMLInputElement | null;
+              dateInput?.showPicker();
+            }}
+            className="relative"
+          >
+            {store.dateFilter && store.dateFilter !== store.todayDate
+              ? store.dateFilter
+              : 'Custom Date'}
+            <input
+              id="date-filter-input"
+              type="date"
+              value={store.dateFilter}
+              onChange={(e) => store.setDateFilter(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">Status:</label>
-          <select
-            value={store.statusFilter}
-            onChange={(e) => store.setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          >
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="seated">Seated</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="no_show">No Show</option>
-          </select>
+        <div className="h-6 w-px bg-border" />
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { value: '', label: 'All' },
+            { value: 'confirmed', label: 'Confirmed' },
+            { value: 'seated', label: 'Seated' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ].map((opt) => (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={store.statusFilter === opt.value ? 'default' : 'outline'}
+              onClick={() => store.setStatusFilter(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
         </div>
 
         <Input
@@ -282,6 +312,7 @@ export default function ReservationsPage() {
                             <Button
                               size="sm"
                               variant={primary.variant === 'default' ? 'default' : 'outline'}
+                              className={primary.variant === 'destructive' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}
                               onClick={() => handleAction(r.id, primary)}
                               disabled={updateStatus.isPending}
                             >
@@ -385,6 +416,7 @@ export default function ReservationsPage() {
                             <Button
                               size="sm"
                               variant={primary.variant === 'default' ? 'default' : 'outline'}
+                              className={primary.variant === 'destructive' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}
                               onClick={() => handleAction(r.id, primary)}
                               disabled={updateStatus.isPending}
                             >

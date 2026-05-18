@@ -130,16 +130,33 @@ export default function BookPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {availability?.slots?.map((slot: { startTime: string }) => (
-                <Button
-                  key={slot.startTime}
-                  variant={store.selectedTime === slot.startTime ? 'default' : 'outline'}
-                  onClick={() => store.setSelectedTime(slot.startTime)}
-                  className="h-12"
-                >
-                  {slot.startTime}
-                </Button>
-              )) || <p className="text-muted-foreground col-span-3 text-center">Select a date and party size...</p>}
+              {availability?.slots?.length ? (
+                availability.slots.map((slot: { startTime: string }) => (
+                  <Button
+                    key={slot.startTime}
+                    variant={store.selectedTime === slot.startTime ? 'default' : 'outline'}
+                    onClick={() => store.setSelectedTime(slot.startTime)}
+                    className="h-12"
+                  >
+                    {slot.startTime}
+                  </Button>
+                ))
+              ) : (
+                <div className="text-muted-foreground col-span-3 text-center py-4">
+                  {availability === undefined ? (
+                    <>
+                      <span className="inline-flex gap-1 mr-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      Finding available times…
+                    </>
+                  ) : (
+                    'No times available for this date and party size. Try a different date.'
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

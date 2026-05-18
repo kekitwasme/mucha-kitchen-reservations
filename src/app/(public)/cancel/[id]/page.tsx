@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { CalendarPlus } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -184,7 +185,8 @@ export default function CancelPage() {
               )}
             </div>
             <Button className="w-full mt-4" render={<Link href="/book" />}>
-              Book Another Table
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Add to Calendar
             </Button>
           </CardContent>
         </Card>
@@ -286,7 +288,8 @@ export default function CancelPage() {
               The reservation for {reservation.customerName} on {reservationDateFormatted} has been cancelled.
             </p>
             <Button className="w-full" render={<Link href="/book" />}>
-              Book Another Table
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Add to Calendar
             </Button>
           </CardContent>
         </Card>

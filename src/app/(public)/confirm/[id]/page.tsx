@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { CalendarPlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +83,7 @@ export default function ConfirmPage() {
   });
 
   const reservation = data?.reservation;
+  const [changesExpanded, setChangesExpanded] = useState(false);
 
   // Loading state
   if (isLoading) {
@@ -163,7 +165,8 @@ export default function ConfirmPage() {
               )}
             </div>
             <Button className="w-full mt-4" render={<Link href="/book" />}>
-              Book Another Table
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Add to Calendar
             </Button>
           </CardContent>
         </Card>
@@ -232,14 +235,37 @@ export default function ConfirmPage() {
       )}
 
       {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button className="flex-1" render={<Link href="/book" />}>
-          Book Another Table
+      <div className="flex flex-col gap-3">
+        <Button className="w-full" render={<Link href="/book" />}>
+          <CalendarPlus className="mr-2 h-4 w-4" />
+          Add to Calendar
         </Button>
         {!isTerminal && (
-          <Button variant="outline" className="flex-1" render={<Link href={`/reschedule/${id}`} />}>
-            Edit Time
-          </Button>
+          <div className="relative">
+            <Button
+              variant="outline"
+              className="w-full justify-center pr-9"
+              render={<Link href={`/reschedule/${id}`} />}
+            >
+              Make Changes…
+            </Button>
+            <span
+              className="absolute right-0 top-0 bottom-0 flex items-center justify-center w-9 cursor-pointer border-l border-border hover:bg-muted rounded-r-lg transition-colors"
+              onClick={() => setChangesExpanded(!changesExpanded)}
+              role="button"
+              tabIndex={0}
+              aria-label="More actions"
+            >
+              {changesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </span>
+          </div>
+        )}
+        {!isTerminal && changesExpanded && (
+          <div className="animate-in slide-in-from-top-1 duration-200">
+            <Button variant="destructive" className="w-full" render={<Link href={`/cancel/${id}`} />}>
+              Cancel Reservation
+            </Button>
+          </div>
         )}
       </div>
     </div>
