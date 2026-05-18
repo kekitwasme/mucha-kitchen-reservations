@@ -2,7 +2,7 @@
 
 A full-stack restaurant reservation and table management system built with Next.js 15, TypeScript, Prisma, and Square APIs.
 
-**Live:** https://mucha-kitchen-reservations.vercel.app (planned)
+**Live:** https://restaurant-reservation-two-theta.vercel.app
 **Repo:** https://github.com/kekitwasme/mucha-kitchen-reservations
 
 ## Features
