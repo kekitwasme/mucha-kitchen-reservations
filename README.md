@@ -1,16 +1,30 @@
-# Restaurant Reservation System
+# Mucha Kitchen — Reservation System
 
 A full-stack restaurant reservation and table management system built with Next.js 15, TypeScript, Prisma, and Square APIs.
 
+**Live:** https://mucha-kitchen-reservations.vercel.app (planned)
+**Repo:** https://github.com/kekitwasme/mucha-kitchen-reservations
+
 ## Features
 
-- **Customer Booking**: Multi-step booking widget with date, party size, time slot selection, and customer details
-- **Floor Plan Visualization**: Interactive Konva canvas showing table availability by color
-- **Reservation Management**: List view with filters, inline status actions (seat, complete, cancel, no-show)
-- **Dashboard**: Today's summary and upcoming arrivals
-- **Square Integration**: Booking sync, customer management, payment tracking
-- **Webhook Handling**: Square webhook receiver for real-time booking updates
-- **Double-Booking Prevention**: Prisma transactions with row-level locking
+| Feature | Status |
+|---------|--------|
+| Customer booking widget (date → party size → time → details) | ✅ |
+| Reservation confirmation page | ✅ |
+| Customer reschedule flow | ✅ |
+| Customer self-cancel page | ✅ |
+| Staff dashboard (today's stats + upcoming arrivals) | ✅ |
+| Staff reservation list with filters (date, status, search) | ✅ |
+| Inline status actions (seat, complete, cancel, no-show) | ✅ |
+| Reservation detail drawer with edit modal | ✅ |
+| Walk-in queue management | ✅ |
+| Interactive floor plan (Konva canvas) | ✅ |
+| Floor plan edit mode (add/move/resize/delete tables) | ✅ |
+| Table combinations and multi-table groups | ✅ |
+| Seating optimization (auto-assign) | ✅ |
+| Square integration (inbound sync, customer lookup, booking creation) | ✅ |
+| Square webhook receiver | ✅ |
+| Double-booking prevention (Prisma transactions) | ✅ |
 
 ## Tech Stack
 
@@ -49,7 +63,8 @@ restaurant-reservation/
 ### 1. Install Dependencies
 
 ```bash
-cd restaurant-reservation
+git clone https://github.com/kekitwasme/mucha-kitchen-reservations.git
+cd mucha-kitchen-reservations
 npm install
 ```
 
@@ -59,6 +74,12 @@ npm install
 cp .env.example .env
 # Edit .env with your database URL and Square credentials
 ```
+
+Key variables:
+- `DATABASE_URL` — PostgreSQL connection string (Neon recommended)
+- `AUTH_SECRET` — NextAuth.js v5 secret (generate with `openssl rand -hex 32`)
+- `SQUARE_ACCESS_TOKEN` + `SQUARE_LOCATION_ID` — Square sandbox credentials
+- `RESTAURANT_ID` — UUID of the restaurant row in your database
 
 ### 3. Database Setup
 
@@ -73,8 +94,11 @@ npx prisma db seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the customer booking page.
-Open [http://localhost:3000/staff/reservations](http://localhost:3000/staff/reservations) for the staff dashboard.
+| URL | Purpose |
+|-----|---------|
+| http://localhost:3000 | Customer booking page |
+| http://localhost:3000/staff/reservations | Staff dashboard |
+| http://localhost:3000/staff/floor-plan | Interactive floor plan |
 
 ### 5. Demo Login
 
