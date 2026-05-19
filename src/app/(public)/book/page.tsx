@@ -260,6 +260,7 @@ export default function BookPage() {
       {store.step === 'seating' && store.date && store.selectedTime && (
         <TableSelector
           tables={tableAvailability?.tables || []}
+          floorObjects={tableAvailability?.floorObjects || []}
           partySize={store.partySize}
           date={store.date}
           time={store.selectedTime}

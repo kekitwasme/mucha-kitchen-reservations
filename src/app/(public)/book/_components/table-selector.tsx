@@ -31,8 +31,23 @@ interface AvailabilityTable {
   } | null;
 }
 
+interface FloorObjectData {
+  id: string;
+  type: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  color: string;
+  opacity: number;
+  zIndex: number;
+}
+
 interface TableSelectorProps {
   tables: AvailabilityTable[];
+  floorObjects?: FloorObjectData[];
   partySize: number;
   date: Date;
   time: string;
@@ -116,7 +131,7 @@ function TableShape({
   );
 }
 
-export default function TableSelector({ tables, partySize, date, time, isLoading }: TableSelectorProps) {
+export default function TableSelector({ tables, floorObjects = [], partySize, date, time, isLoading }: TableSelectorProps) {
   const store = useBookingStore();
   const [area, setArea] = useState<string>('all');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -149,21 +164,22 @@ export default function TableSelector({ tables, partySize, date, time, isLoading
     [tables, store.selectedTableId]
   );
 
-  // Compute SVG viewBox from table positions
+  // Compute SVG viewBox from table + object positions
   const viewBox = useMemo(() => {
-    if (filteredTables.length === 0) return { x: 0, y: 0, w: 800, h: 600 };
+    const allItems = [...filteredTables, ...floorObjects];
+    if (allItems.length === 0) return { x: 0, y: 0, w: 800, h: 600 };
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
       maxY = -Infinity;
-    for (const t of filteredTables) {
+    for (const t of allItems) {
       minX = Math.min(minX, t.x - 20);
       minY = Math.min(minY, t.y - 20);
       maxX = Math.max(maxX, t.x + t.width + 20);
       maxY = Math.max(maxY, t.y + t.height + 20);
     }
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }, [filteredTables]);
+  }, [filteredTables, floorObjects]);
 
   const handleSelect = (table: AvailabilityTable) => {
     if (table.status !== 'available') return;
@@ -341,12 +357,44 @@ export default function TableSelector({ tables, partySize, date, time, isLoading
                       height={viewBox.h}
                       fill="url(#grid)"
                     />
+                    {/* Floor objects behind tables (zIndex 0) */}
+                    {floorObjects.filter((o) => o.zIndex === 0).map((obj) => (
+                      <rect
+                        key={obj.id}
+                        x={obj.x}
+                        y={obj.y}
+                        width={obj.width}
+                        height={obj.height}
+                        rx={4}
+                        ry={4}
+                        fill={obj.color}
+                        opacity={obj.opacity}
+                        transform={obj.rotation !== 0 ? `rotate(${obj.rotation} ${obj.x + obj.width / 2} ${obj.y + obj.height / 2})` : undefined}
+                        pointerEvents="none"
+                      />
+                    ))}
                     {filteredTables.map((table) => (
                       <TableShape
                         key={table.id}
                         table={table}
                         isSelected={table.id === store.selectedTableId}
                         onClick={() => handleSelect(table)}
+                      />
+                    ))}
+                    {/* Floor objects in front (zIndex 1) */}
+                    {floorObjects.filter((o) => o.zIndex === 1).map((obj) => (
+                      <rect
+                        key={obj.id}
+                        x={obj.x}
+                        y={obj.y}
+                        width={obj.width}
+                        height={obj.height}
+                        rx={4}
+                        ry={4}
+                        fill={obj.color}
+                        opacity={obj.opacity}
+                        transform={obj.rotation !== 0 ? `rotate(${obj.rotation} ${obj.x + obj.width / 2} ${obj.y + obj.height / 2})` : undefined}
+                        pointerEvents="none"
                       />
                     ))}
                   </svg>

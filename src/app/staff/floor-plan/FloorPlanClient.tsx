@@ -472,6 +472,7 @@ function DetailPanel({
   onDeleteTable,
   onDeleteObject,
   onUpdateTableCapacity,
+  onUpdateObjectLabel,
   onAddCombination,
   onDeleteCombination,
   tableGroups,
@@ -489,6 +490,7 @@ function DetailPanel({
   onDeleteTable: (id: string) => void;
   onDeleteObject: (id: string) => void;
   onUpdateTableCapacity: (id: string, capacity: number) => void;
+  onUpdateObjectLabel: (id: string, label: string) => void;
   onAddCombination: (tableAId: string, tableBId: string, combinedCapacity: number) => void;
   onDeleteCombination: (id: string) => void;
   tableGroups: TableGroupItem[];
@@ -618,7 +620,27 @@ function DetailPanel({
     return (
       <div className="w-72 border-l bg-white p-4 space-y-4 overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-lg text-center">{floorObj.label}</h3>
+          {isEditMode ? (
+            <input
+              type="text"
+              defaultValue={floorObj.label}
+              className="font-semibold text-lg text-center border rounded px-2 py-1 w-full mr-2"
+              onBlur={async (e) => {
+                const label = e.target.value.trim();
+                if (label && label !== floorObj.label) {
+                  onUpdateObjectLabel(floorObj.id, label);
+                  try {
+                    await fetch(`/api/floor-objects/${floorObj.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ label }) });
+                  } catch { /* ignore */ }
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+            />
+          ) : (
+            <h3 className="font-semibold text-lg text-center">{floorObj.label}</h3>
+          )}
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
         <div className="space-y-2">
@@ -844,6 +866,12 @@ export default function FloorPlanPage() {
 
   const handleObjectTransformEnd = useCallback((id: string, x: number, y: number, w: number, h: number, rotation: number) => {
     setFloorObjects((prev) => prev.map((o) => (o.id === id ? { ...o, x: snapToGrid(x), y: snapToGrid(y), width: Math.round(w), height: Math.round(h), rotation } : o)));
+    setHasChanges(true);
+  }, []);
+
+  // Update object label locally
+  const handleUpdateObjectLabel = useCallback((id: string, label: string) => {
+    setFloorObjects((prev) => prev.map((o) => o.id === id ? { ...o, label } : o));
     setHasChanges(true);
   }, []);
 
@@ -1267,6 +1295,7 @@ export default function FloorPlanPage() {
             onDeleteTable={handleDeleteTable}
             onDeleteObject={handleDeleteObject}
             onUpdateTableCapacity={handleUpdateCapacity}
+            onUpdateObjectLabel={handleUpdateObjectLabel}
             onAddCombination={handleAddCombination}
             onDeleteCombination={handleDeleteCombination}
             combinations={combinations}

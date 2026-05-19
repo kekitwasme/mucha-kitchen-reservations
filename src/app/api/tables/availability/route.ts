@@ -32,6 +32,20 @@ const querySchema = z.object({
 
 export type TableAvailabilityStatus = 'available' | 'booked' | 'unsuitable';
 
+export interface FloorObjectData {
+  id: string;
+  type: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  color: string;
+  opacity: number;
+  zIndex: number;
+}
+
 export interface TableAvailability {
   id: string;
   name: string;
@@ -127,6 +141,25 @@ export async function GET(request: NextRequest) {
       orderBy: [{ area: 'asc' }, { name: 'asc' }],
     });
 
+    // Fetch floor objects for visual context
+    const floorObjects = await prisma.floorObject.findMany({
+      where: { restaurantId: restaurant.id },
+      select: {
+        id: true,
+        type: true,
+        label: true,
+        x: true,
+        y: true,
+        width: true,
+        height: true,
+        rotation: true,
+        color: true,
+        opacity: true,
+        zIndex: true,
+      },
+      orderBy: [{ zIndex: 'asc' }, { createdAt: 'asc' }],
+    });
+
     const result: TableAvailability[] = tables.map((t) => {
       const suitable = t.capacity >= partySize;
       const conflict = occupiedTableIds.get(t.id) ?? null;
@@ -170,6 +203,7 @@ export async function GET(request: NextRequest) {
       partySize,
       turnTimeMinutes: turnTime,
       tables: result,
+      floorObjects,
     });
   } catch (err) {
     console.error('[GET /api/tables/availability]', err);
