@@ -32,6 +32,7 @@ export async function GET() {
         turnTimeRules: restaurant.turnTimeRules,
         maxPartySize: restaurant.maxPartySize,
         bookingWindowDays: restaurant.bookingWindowDays,
+        blockOutHours: restaurant.blockOutHours,
         depositRules: restaurant.depositRules,
         smsReminderMinutes: restaurant.smsReminderMinutes,
         squareLocationId: restaurant.squareLocationId,
@@ -77,6 +78,7 @@ export async function PATCH(request: NextRequest) {
     if (data.turnTimeRules !== undefined) updateData.turnTimeRules = data.turnTimeRules;
     if (data.maxPartySize !== undefined) updateData.maxPartySize = data.maxPartySize;
     if (data.bookingWindowDays !== undefined) updateData.bookingWindowDays = data.bookingWindowDays;
+    if (data.blockOutHours !== undefined) updateData.blockOutHours = data.blockOutHours;
     if (data.depositRules !== undefined) updateData.depositRules = data.depositRules;
     if (data.smsReminderMinutes !== undefined) updateData.smsReminderMinutes = data.smsReminderMinutes;
 
@@ -111,6 +113,7 @@ export async function PATCH(request: NextRequest) {
         turnTimeRules: updated.turnTimeRules,
         maxPartySize: updated.maxPartySize,
         bookingWindowDays: updated.bookingWindowDays,
+        blockOutHours: updated.blockOutHours,
         depositRules: updated.depositRules,
         smsReminderMinutes: updated.smsReminderMinutes,
         squareLocationId: updated.squareLocationId,

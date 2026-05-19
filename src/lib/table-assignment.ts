@@ -181,9 +181,10 @@ export async function generateAvailabilitySlots(
 
   // ── Batch fetch: 3 queries total ──────────────────────────────────────
 
-  const [rules, restaurant, allTables, allGroups, occupiedReservations] = await Promise.all([
-    prisma.availabilityRule.findFirst({
+  const [allRules, restaurant, allTables, allGroups, occupiedReservations] = await Promise.all([
+    prisma.availabilityRule.findMany({
       where: { restaurantId, dayOfWeek, active: true },
+      orderBy: { sortOrder: "asc" },
     }),
     prisma.restaurant.findUnique({
       where: { id: restaurantId },
@@ -218,11 +219,9 @@ export async function generateAvailabilitySlots(
     }),
   ]);
 
-  if (!rules || !restaurant) return [];
+  if (!allRules.length || !restaurant) return [];
 
   const turnTime = getTurnTime(partySize, restaurant.turnTimeRules as Record<string, number>);
-  const startMinutes = parseInt(rules.startTime.split(':')[0]) * 60 + parseInt(rules.startTime.split(':')[1]);
-  const endMinutes = parseInt(rules.endTime.split(':')[0]) * 60 + parseInt(rules.endTime.split(':')[1]);
 
   // ── Build in-memory lookup: tableId → list of (start, end) occupied intervals ──
 
@@ -249,7 +248,11 @@ export async function generateAvailabilitySlots(
 
   const slots: { startTime: string; endTime: string; availableTableIds: string[]; availableTableNames: string[] }[] = [];
 
-  for (let m = startMinutes; m + turnTime <= endMinutes; m += rules.slotInterval) {
+  for (const rule of allRules) {
+    const startMinutes = parseInt(rule.startTime.split(':')[0]) * 60 + parseInt(rule.startTime.split(':')[1]);
+    const endMinutes = parseInt(rule.endTime.split(':')[0]) * 60 + parseInt(rule.endTime.split(':')[1]);
+
+    for (let m = startMinutes; m + turnTime <= endMinutes; m += rule.slotInterval) {
     const startH = Math.floor(m / 60);
     const startMin = m % 60;
     const endH = Math.floor((m + turnTime) / 60);
@@ -295,6 +298,8 @@ export async function generateAvailabilitySlots(
         availableTableNames: fitting.length > 0 ? fitting.map((t) => t.name) : availableGroups.flatMap((g) => g.tableNames),
       });
     }
+  }
+
   }
 
   return slots;

@@ -91,7 +91,14 @@ export const createReservationSchema = z.object({
   reservationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
   startTime: z.string().regex(/^\d{2}:\d{2}$/),            // HH:MM
   notes: z.string().max(500).optional(),
+  dietaryRequirements: z.string().max(200).optional(),
+  occasion: z.enum(['birthday', 'anniversary', 'business', 'other', 'date_night', 'none']).optional().default('none'),
+  highChairs: z.number().min(0).max(10).optional().default(0),
+  isReturningGuest: z.boolean().optional().default(false),
+  guestType: z.enum(['new', 'returning', 'regular']).optional().default('new'),
   preferredTableIds: z.array(z.string()).optional(),
+  seatingChoice: z.enum(['auto', 'manual']).optional().default('auto'),
+  tableId: z.string().optional(),
   source: ReservationSourceEnum.optional().default('online'),
   status: ReservationStatusEnum.optional(), // walk-ins may pass 'seated' or 'pending'
 });
@@ -118,6 +125,11 @@ export const updateReservationSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time').optional(),
   status: ReservationStatusEnum.optional(),
   notes: z.string().max(500).optional().nullable(),
+  dietaryRequirements: z.string().max(200).optional().nullable(),
+  occasion: z.enum(['birthday', 'anniversary', 'business', 'other', 'date_night', 'none']).optional(),
+  highChairs: z.number().min(0).max(10).optional(),
+  isReturningGuest: z.boolean().optional(),
+  guestType: z.enum(['new', 'returning', 'regular']).optional(),
   tableIds: z.array(z.string()).optional(),
   source: ReservationSourceEnum.optional(),
 });
@@ -156,6 +168,7 @@ export const updateSettingsSchema = z.object({
   turnTimeRules: z.record(z.string(), z.any()).optional(),
   maxPartySize: z.number().min(1).optional(),
   bookingWindowDays: z.number().min(1).optional(),
+  blockOutHours: z.number().min(0).optional(),
   depositRules: z.record(z.string(), z.any()).optional().nullable(),
   smsReminderMinutes: z.number().min(0).optional(),
 });

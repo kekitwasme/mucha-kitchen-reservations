@@ -8,6 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum GuestType {
+  new
+  returning
+  regular
+}
+
 enum ReservationStatus {
   pending
   confirmed
@@ -76,6 +82,7 @@ model Restaurant {
   turnTimeRules      Json
   maxPartySize       Int      @default(20)
   bookingWindowDays  Int      @default(30)
+  blockOutHours      Decimal  @default(1.5) @db.Decimal(4,2)
   depositRules       Json?
   smsReminderMinutes Int      @default(60)
   squareLocationId   String?
@@ -94,6 +101,7 @@ model Restaurant {
   availabilityRules AvailabilityRule[]
   auditLogs         AuditLog[]
   staffUsers        StaffUser[]
+  specialHoursOverrides SpecialHoursOverride[]
 }
 
 model Table {
@@ -182,6 +190,11 @@ model Reservation {
   status           ReservationStatus @default(pending)
   source           ReservationSource @default(online)
   notes            String?
+  dietaryRequirements String?         // e.g. "Vegetarian, Nut allergy"
+  occasion         String?            // birthday, anniversary, business, other
+  highChairs       Int                @default(0)
+  isReturningGuest Boolean            @default(false)
+  guestType        GuestType?         @default(new)
   squareBookingId  String?
   squareCustomerId String?
   depositAmount    Int?
@@ -259,6 +272,8 @@ model AvailabilityRule {
   dayOfWeek    Int
   startTime    String
   endTime      String
+  label        String?
+  sortOrder    Int      @default(0)
   slotInterval Int      @default(15)
   maxCovers    Int
   active       Boolean  @default(true)
@@ -267,6 +282,22 @@ model AvailabilityRule {
 
   @@unique([restaurantId, dayOfWeek, startTime])
   @@index([restaurantId, dayOfWeek])
+}
+
+model SpecialHoursOverride {
+  id           String   @id @default(cuid())
+  restaurantId String
+  date         DateTime @db.Date
+  isClosed     Boolean  @default(false)
+  segments     Json     // Array of { startTime, endTime, label } — replaces day-of-week segments for this date
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, date])
+  @@index([restaurantId, date])
 }
 
 model BlockedTime {

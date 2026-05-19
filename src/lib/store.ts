@@ -13,13 +13,17 @@ import { create } from 'zustand';
 // ─── Booking Flow ───────────────────────────────────────────────
 
 /** Steps in the customer booking wizard. */
-export type BookingStep = 'date' | 'party' | 'time' | 'details';
+export type BookingStep = 'date' | 'party' | 'time' | 'seating' | 'details';
 
 interface BookingState {
   step: BookingStep;
   date: Date | undefined;
   partySize: number;
   selectedTime: string | null;
+  selectedTableId: string | null;
+  seatingChoice: 'auto' | 'manual' | null;
+  setSelectedTableId: (id: string | null) => void;
+  setSeatingChoice: (choice: 'auto' | 'manual' | null) => void;
   setStep: (step: BookingStep) => void;
   setDate: (date: Date | undefined) => void;
   setPartySize: (size: number) => void;
@@ -32,15 +36,19 @@ const initialBookingState = {
   date: undefined,
   partySize: 2,
   selectedTime: null,
+  selectedTableId: null,
+  seatingChoice: null,
 };
 
-/** Manages the customer booking wizard state (step, date, party size, time slot). */
+/** Manages the customer booking wizard state (step, date, party size, time slot, table selection). */
 export const useBookingStore = create<BookingState>((set) => ({
   ...initialBookingState,
   setStep: (step) => set({ step }),
   setDate: (date) => set({ date, step: 'party' }),
   setPartySize: (partySize) => set({ partySize, step: 'time' }),
-  setSelectedTime: (selectedTime) => set({ selectedTime, step: 'details' }),
+  setSelectedTime: (selectedTime) => set({ selectedTime }),
+  setSelectedTableId: (selectedTableId) => set({ selectedTableId }),
+  setSeatingChoice: (seatingChoice) => set({ seatingChoice }),
   reset: () => set(initialBookingState),
 }));
 

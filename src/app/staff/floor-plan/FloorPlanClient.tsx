@@ -103,6 +103,9 @@ const OBJECT_PRESETS: Record<string, { color: string; width: number; height: num
   custom: { color: '#94a3b8', width: 80, height: 40, label: 'Custom' },
 };
 
+const GRID_SIZE = 20;
+const snapToGrid = (val: number) => Math.round(val / GRID_SIZE) * GRID_SIZE;
+
 // ── Grid Background ─────────────────────────────────────────────────────────
 
 function GridBackground({ width, height }: { width: number; height: number }) {
@@ -129,22 +132,32 @@ interface FloorObjectShapeProps {
 }
 
 const FloorObjectShape = React.forwardRef<Konva.Group, FloorObjectShapeProps>(
-  ({ obj, isSelected, isEditMode, onSelect, onDragEnd, onTransformEnd }, ref) => {
+  ({ obj, isSelected, isEditMode, onSelect, onDragEnd, onTransformEnd }, forwardedRef) => {
+    const groupRef = useRef<Konva.Group>(null);
     const trRef = useRef<Konva.Transformer>(null);
 
+    // Sync internal ref with forwarded ref
     useEffect(() => {
-      if (isSelected && isEditMode && trRef.current && ref && 'current' in ref && ref.current) {
-        trRef.current.nodes([ref.current]);
+      if (typeof forwardedRef === 'function') {
+        forwardedRef(groupRef.current);
+      } else if (forwardedRef && 'current' in forwardedRef) {
+        forwardedRef.current = groupRef.current;
+      }
+    }, [forwardedRef]);
+
+    useEffect(() => {
+      if (isSelected && isEditMode && trRef.current && groupRef.current) {
+        trRef.current.nodes([groupRef.current]);
         trRef.current.getLayer()?.batchDraw();
       } else if (trRef.current) {
         trRef.current.nodes([]);
         trRef.current.getLayer()?.batchDraw();
       }
-    }, [isSelected, isEditMode, ref]);
+    }, [isSelected, isEditMode]);
 
     const handleTransformEnd = () => {
-      if (!ref || !('current' in ref) || !ref.current) return;
-      const node = ref.current;
+      if (!groupRef.current) return;
+      const node = groupRef.current;
       const sx = node.scaleX();
       const sy = node.scaleY();
       node.scaleX(1);
@@ -155,15 +168,23 @@ const FloorObjectShape = React.forwardRef<Konva.Group, FloorObjectShapeProps>(
     return (
       <>
         <Group
-          ref={ref}
+          ref={groupRef}
           x={obj.x}
           y={obj.y}
           rotation={obj.rotation}
           draggable={isEditMode}
           onClick={onSelect}
           onTap={onSelect}
+          onDragMove={(e) => {
+            if (!isEditMode) return;
+            const node = e.target;
+            node.x(snapToGrid(node.x()));
+            node.y(snapToGrid(node.y()));
+          }}
           onDragEnd={(e) => onDragEnd(obj.id, e.target.x(), e.target.y())}
           onTransformEnd={handleTransformEnd}
+          onMouseEnter={(e) => { if (isEditMode) { const container = e.target.getStage()?.container(); if (container) container.style.cursor = 'move'; } }}
+          onMouseLeave={(e) => { const container = e.target.getStage()?.container(); if (container) container.style.cursor = 'default'; }}
         >
           <Rect
             width={obj.width}
@@ -193,6 +214,7 @@ const FloorObjectShape = React.forwardRef<Konva.Group, FloorObjectShapeProps>(
             }}
             rotateEnabled
             rotationSnaps={[0, 45, 90, 135, 180]}
+            enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
           />
         )}
       </>
@@ -216,19 +238,32 @@ interface TransformableTableProps {
 }
 
 const TransformableTable = React.forwardRef<Konva.Group, TransformableTableProps>(
-  ({ table, isSelected, isEditMode, isHighlighted, isFindTableMode, previewReservations, onSelect, onDragEnd, onTransformEnd }, ref) => {
+  ({ table, isSelected, isEditMode, isHighlighted, isFindTableMode, previewReservations, onSelect, onDragEnd, onTransformEnd }, forwardedRef) => {
+    const groupRef = useRef<Konva.Group>(null);
     const trRef = useRef<Konva.Transformer>(null);
 
+    // Sync internal ref with forwarded ref
     useEffect(() => {
-      if (isSelected && isEditMode && trRef.current && ref && 'current' in ref && ref.current) {
-        trRef.current.nodes([ref.current]);
+      if (typeof forwardedRef === 'function') {
+        forwardedRef(groupRef.current);
+      } else if (forwardedRef && 'current' in forwardedRef) {
+        forwardedRef.current = groupRef.current;
+      }
+    }, [forwardedRef]);
+
+    useEffect(() => {
+      if (isSelected && isEditMode && trRef.current && groupRef.current) {
+        trRef.current.nodes([groupRef.current]);
+        trRef.current.getLayer()?.batchDraw();
+      } else if (trRef.current) {
+        trRef.current.nodes([]);
         trRef.current.getLayer()?.batchDraw();
       }
-    }, [isSelected, isEditMode, ref]);
+    }, [isSelected, isEditMode]);
 
     const handleTransformEnd = () => {
-      if (!ref || !('current' in ref) || !ref.current) return;
-      const node = ref.current;
+      if (!groupRef.current) return;
+      const node = groupRef.current;
       const sx = node.scaleX();
       const sy = node.scaleY();
       node.scaleX(1);
@@ -245,13 +280,19 @@ const TransformableTable = React.forwardRef<Konva.Group, TransformableTableProps
     return (
       <>
         <Group
-          ref={ref}
+          ref={groupRef}
           x={table.x}
           y={table.y}
           rotation={table.rotation}
           draggable={isEditMode}
           onClick={onSelect}
           onTap={onSelect}
+          onDragMove={(e) => {
+            if (!isEditMode) return;
+            const node = e.target;
+            node.x(snapToGrid(node.x()));
+            node.y(snapToGrid(node.y()));
+          }}
           onDragEnd={(e) => onDragEnd(table.id, e.target.x(), e.target.y())}
           onTransformEnd={handleTransformEnd}
           opacity={isFindTableMode && !isHighlighted ? 0.3 : 1}
@@ -779,23 +820,30 @@ export default function FloorPlanPage() {
   // Pinch-to-zoom
   const lastDist = useRef<number | null>(null);
 
+  const GRID_SIZE = 20;
+  const snapToGrid = (val: number) => Math.round(val / GRID_SIZE) * GRID_SIZE;
+
   const handleTableDragEnd = useCallback((id: string, x: number, y: number) => {
-    setTables((prev) => prev.map((t) => (t.id === id ? { ...t, x, y } : t)));
+    const sx = snapToGrid(x);
+    const sy = snapToGrid(y);
+    setTables((prev) => prev.map((t) => (t.id === id ? { ...t, x: sx, y: sy } : t)));
     setHasChanges(true);
   }, []);
 
   const handleTableTransformEnd = useCallback((id: string, x: number, y: number, w: number, h: number, rotation: number) => {
-    setTables((prev) => prev.map((t) => (t.id === id ? { ...t, x, y, width: w, height: h, rotation } : t)));
+    setTables((prev) => prev.map((t) => (t.id === id ? { ...t, x: snapToGrid(x), y: snapToGrid(y), width: Math.round(w), height: Math.round(h), rotation } : t)));
     setHasChanges(true);
   }, []);
 
   const handleObjectDragEnd = useCallback((id: string, x: number, y: number) => {
-    setFloorObjects((prev) => prev.map((o) => (o.id === id ? { ...o, x, y } : o)));
+    const sx = snapToGrid(x);
+    const sy = snapToGrid(y);
+    setFloorObjects((prev) => prev.map((o) => (o.id === id ? { ...o, x: sx, y: sy } : o)));
     setHasChanges(true);
   }, []);
 
   const handleObjectTransformEnd = useCallback((id: string, x: number, y: number, w: number, h: number, rotation: number) => {
-    setFloorObjects((prev) => prev.map((o) => (o.id === id ? { ...o, x, y, width: w, height: h, rotation } : o)));
+    setFloorObjects((prev) => prev.map((o) => (o.id === id ? { ...o, x: snapToGrid(x), y: snapToGrid(y), width: Math.round(w), height: Math.round(h), rotation } : o)));
     setHasChanges(true);
   }, []);
 

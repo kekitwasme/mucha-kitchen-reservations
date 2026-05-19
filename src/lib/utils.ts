@@ -61,6 +61,7 @@ export function getTurnTime(
   rules: Record<string, number>
 ): number {
   for (const [range, minutes] of Object.entries(rules)) {
+    if (range === 'default') continue; // handled below
     if (range.endsWith('+')) {
       const min = parseInt(range, 10);
       if (partySize >= min) return minutes;
@@ -69,7 +70,7 @@ export function getTurnTime(
       if (partySize >= min && partySize <= max) return minutes;
     }
   }
-  return 90; // default fallback
+  return rules.default ?? 90; // use configured default, fallback to 90
 }
 
 // ─── Table Assignment Helpers ───────────────────────────────────

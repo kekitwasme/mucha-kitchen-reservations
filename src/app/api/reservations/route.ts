@@ -164,7 +164,14 @@ export async function POST(request: NextRequest) {
       reservationDate: dateStr,
       startTime: startTimeStr,
       notes,
+      dietaryRequirements,
+      occasion,
+      highChairs,
+      isReturningGuest,
+      guestType,
       preferredTableIds,
+      seatingChoice,
+      tableId,
       source,
       status: requestedStatus,
     } = parsed.data;
@@ -221,16 +228,45 @@ export async function POST(request: NextRequest) {
           return { error: 'NO_AVAILABILITY', message: 'No tables available for the selected time' };
         }
 
-        // Find optimal table (single or group)
-        const singleMatch = availableTables
-          .filter((t) => t.capacity >= partySize && t.minCapacity <= partySize)
-          .sort((a, b) => a.capacity - b.capacity)[0];
+        let candidate: { id: string; name: string; capacity: number } | null = null;
+        let candidateTableIds: string[] = [];
+        let candidateTableNames: string[] = [];
 
-        let candidate: { id: string; name: string; capacity: number } | null = singleMatch
-          ? { id: singleMatch.id, name: singleMatch.name, capacity: singleMatch.capacity }
-          : null;
-        let candidateTableIds: string[] = singleMatch ? [singleMatch.id] : [];
-        let candidateTableNames: string[] = singleMatch ? [singleMatch.name] : [];
+        // Manual table selection: if tableId provided and seatingChoice is manual, honour it
+        if (seatingChoice === 'manual' && tableId) {
+          const requestedTable = await tx.table.findUnique({
+            where: { id: tableId, active: true },
+          });
+
+          if (!requestedTable) {
+            return { error: 'TABLE_NOT_FOUND', message: 'Selected table does not exist' };
+          }
+
+          if (occupiedIds.includes(tableId)) {
+            return { error: 'TABLE_JUST_BOOKED', message: 'Sorry, that table was just booked. Please choose another.' };
+          }
+
+          if (requestedTable.capacity < partySize) {
+            return { error: 'TABLE_TOO_SMALL', message: 'Selected table is too small for your party' };
+          }
+
+          candidate = { id: requestedTable.id, name: requestedTable.name, capacity: requestedTable.capacity };
+          candidateTableIds = [requestedTable.id];
+          candidateTableNames = [requestedTable.name];
+        }
+
+        // Auto assignment: existing greedy logic (or preferredTableIds)
+        if (!candidate) {
+          const singleMatch = availableTables
+            .filter((t) => t.capacity >= partySize && t.minCapacity <= partySize)
+            .sort((a, b) => a.capacity - b.capacity)[0];
+
+          if (singleMatch) {
+            candidate = { id: singleMatch.id, name: singleMatch.name, capacity: singleMatch.capacity };
+            candidateTableIds = [singleMatch.id];
+            candidateTableNames = [singleMatch.name];
+          }
+        }
 
         // No single table fits — try table groups
         if (!candidate) {
@@ -316,18 +352,16 @@ export async function POST(request: NextRequest) {
             status: requestedStatus || 'confirmed',
             source: (source || 'online') as ReservationSource,
             notes: notes || null,
+            dietaryRequirements: dietaryRequirements || null,
+            occasion: occasion || null,
+            highChairs: highChairs || 0,
+            isReturningGuest: isReturningGuest || false,
+            guestType: guestType || 'new',
+            reservationTables: {
+              create: candidateTableIds.map((id: string) => ({ tableId: id })),
+            },
           },
         });
-
-        // Link table(s)
-        for (const tableId of candidateTableIds) {
-          await tx.reservationTable.create({
-            data: {
-              reservationId: reservation.id,
-              tableId,
-            },
-          });
-        }
 
         // Audit log
         await tx.auditLog.create({
