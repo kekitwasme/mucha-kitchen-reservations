@@ -13,7 +13,7 @@ import { create } from 'zustand';
 // ─── Booking Flow ───────────────────────────────────────────────
 
 /** Steps in the customer booking wizard. */
-export type BookingStep = 'date' | 'party' | 'time' | 'seating' | 'details';
+export type BookingStep = 'date' | 'party' | 'time' | 'details';
 
 interface BookingState {
   step: BookingStep;

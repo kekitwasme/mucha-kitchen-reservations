@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useBookingStore, type BookingStep } from '@/lib/store';
-import TableSelector from './_components/table-selector';
+
 
 export default function BookPage() {
   const store = useBookingStore();
@@ -23,7 +23,7 @@ export default function BookPage() {
   const [highChairs, setHighChairs] = useState(0);
   const [guestType, setGuestType] = useState<'new' | 'returning' | 'regular'>('new');
 
-  const steps: BookingStep[] = ['date', 'party', 'time', 'seating', 'details'];
+  const steps: BookingStep[] = ['date', 'party', 'time', 'details'];
   const currentStepIndex = steps.indexOf(store.step);
 
   const goBack = () => {
@@ -41,25 +41,7 @@ export default function BookPage() {
       if (!res.ok) throw new Error('Failed to fetch availability');
       return res.json();
     },
-    enabled: !!store.date && (store.step === 'time' || store.step === 'seating'),
-  });
-
-  const { data: tableAvailability, isLoading: tablesLoading } = useQuery({
-    queryKey: [
-      'tables-availability',
-      format(store.date || new Date(), 'yyyy-MM-dd'),
-      store.selectedTime,
-      store.partySize,
-    ],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/tables/availability?date=${format(store.date || new Date(), 'yyyy-MM-dd')}&time=${store.selectedTime}&partySize=${store.partySize}`
-      );
-      if (!res.ok) throw new Error('Failed to fetch table availability');
-      return res.json();
-    },
-    enabled: !!store.date && !!store.selectedTime && store.step === 'seating',
-    refetchInterval: 15000, // refresh every 15s to catch newly-booked tables
+    enabled: !!store.date && store.step === 'time',
   });
 
   const createReservation = useMutation({
@@ -93,10 +75,7 @@ export default function BookPage() {
       highChairs,
       isReturningGuest: guestType !== 'new',
       guestType,
-      seatingChoice: store.seatingChoice || 'auto',
-      ...(store.seatingChoice === 'manual' && store.selectedTableId
-        ? { tableId: store.selectedTableId }
-        : {}),
+      seatingChoice: 'auto',
     };
 
     createReservation.mutate(payload);
@@ -134,7 +113,6 @@ export default function BookPage() {
             (store.step === 'date' && !store.date) ||
             (store.step === 'party' && !store.partySize) ||
             (store.step === 'time' && !store.selectedTime) ||
-            (store.step === 'seating' && (!store.seatingChoice || (store.seatingChoice === 'manual' && !store.selectedTableId))) ||
             (store.step === 'details' && (!name || !phone || createReservation.isPending))
           }
           className="w-full sm:w-auto sm:flex-1 h-12"
@@ -256,20 +234,7 @@ export default function BookPage() {
         </Card>
       )}
 
-      {/* Step 4: Seating Choice */}
-      {store.step === 'seating' && store.date && store.selectedTime && (
-        <TableSelector
-          tables={tableAvailability?.tables || []}
-          tableGroups={tableAvailability?.tableGroups || []}
-          floorObjects={tableAvailability?.floorObjects || []}
-          partySize={store.partySize}
-          date={store.date}
-          time={store.selectedTime}
-          isLoading={tablesLoading}
-        />
-      )}
-
-      {/* Step 5: Details */}
+      {/* Step 4: Details */}
       {store.step === 'details' && (
         <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <CardHeader>
