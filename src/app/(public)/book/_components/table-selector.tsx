@@ -45,8 +45,22 @@ interface FloorObjectData {
   zIndex: number;
 }
 
+interface TableGroupData {
+  id: string;
+  name: string;
+  tableIds: string[];
+  combinedCapacity: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  status: TableAvailabilityStatus;
+  suitable: boolean;
+}
+
 interface TableSelectorProps {
   tables: AvailabilityTable[];
+  tableGroups?: TableGroupData[];
   floorObjects?: FloorObjectData[];
   partySize: number;
   date: Date;
@@ -131,7 +145,54 @@ function TableShape({
   );
 }
 
-export default function TableSelector({ tables, floorObjects = [], partySize, date, time, isLoading }: TableSelectorProps) {
+function GroupShape({
+  group,
+  isSelected,
+  onClick,
+}: {
+  group: TableGroupData;
+  isSelected?: boolean;
+  onClick?: () => void;
+}) {
+  const isClickable = group.status === 'available';
+
+  return (
+    <g
+      onClick={onClick}
+      style={{ cursor: isClickable ? 'pointer' : 'not-allowed' }}
+      opacity={group.status !== 'available' ? 0.6 : 1}
+    >
+      <rect
+        x={group.x}
+        y={group.y}
+        width={group.width}
+        height={group.height}
+        rx={4}
+        ry={4}
+        fill="#e0e7ff"
+        fillOpacity={0.3}
+        stroke={isSelected ? '#2563eb' : '#4f46e5'}
+        strokeWidth={isSelected ? 4 : 2}
+        strokeDasharray="4 2"
+        pointerEvents="none"
+      />
+      <text
+        x={group.x + group.width / 2}
+        y={group.y + group.height + 14}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={10}
+        fontWeight={600}
+        fill={isSelected ? '#1e40af' : '#1e293b'}
+        pointerEvents="none"
+      >
+        {group.name} • {group.combinedCapacity} seats
+      </text>
+    </g>
+  );
+}
+
+export default function TableSelector({ tables, tableGroups = [], floorObjects = [], partySize, date, time, isLoading }: TableSelectorProps) {
   const store = useBookingStore();
   const [area, setArea] = useState<string>('all');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -164,9 +225,14 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
     [tables, store.selectedTableId]
   );
 
-  // Compute SVG viewBox from table + object positions
+  const selectedGroup = useMemo(
+    () => tableGroups.find((g) => g.id === store.selectedGroupId) || null,
+    [tableGroups, store.selectedGroupId]
+  );
+
+  // Compute SVG viewBox from table + group + object positions
   const viewBox = useMemo(() => {
-    const allItems = [...filteredTables, ...floorObjects];
+    const allItems = [...filteredTables, ...tableGroups, ...floorObjects];
     if (allItems.length === 0) return { x: 0, y: 0, w: 800, h: 600 };
     let minX = Infinity,
       minY = Infinity,
@@ -179,15 +245,20 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
       maxY = Math.max(maxY, t.y + t.height + 20);
     }
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }, [filteredTables, floorObjects]);
+  }, [filteredTables, tableGroups, floorObjects]);
 
   const handleSelect = (table: AvailabilityTable) => {
     if (table.status !== 'available') return;
     store.setSelectedTableId(table.id === store.selectedTableId ? null : table.id);
   };
 
+  const handleGroupSelect = (group: TableGroupData) => {
+    if (group.status !== 'available') return;
+    store.setSelectedGroupId(group.id === store.selectedGroupId ? null : group.id);
+  };
+
   const handleConfirmSelection = () => {
-    if (!store.selectedTableId) return;
+    if (!store.selectedTableId && !store.selectedGroupId) return;
     store.setStep('details');
   };
 
@@ -200,11 +271,12 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
   const handleManualSelect = () => {
     store.setSeatingChoice('manual');
     store.setSelectedTableId(null);
+    store.setSelectedGroupId(null);
   };
 
-  const noTablesAtAll = tables.length === 0;
-  const noSuitableTables = tables.length > 0 && tables.every((t) => !t.suitable);
-  const noAvailableTables = tables.length > 0 && tables.filter((t) => t.suitable).every((t) => t.status === 'booked');
+  const noTablesAtAll = tables.length === 0 && tableGroups.length === 0;
+  const noSuitableTables = tables.every((t) => !t.suitable) && tableGroups.every((g) => !g.suitable);
+  const noAvailableTables = tables.filter((t) => t.suitable).every((t) => t.status === 'booked') && tableGroups.filter((g) => g.suitable).every((g) => g.status === 'booked');
 
   return (
     <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -325,6 +397,10 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
                     <span className="w-3 h-3 rounded-sm border-2 border-blue-600"></span>
                     <span>Selected</span>
                   </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-sm border border-dashed border-indigo-600"></span>
+                    <span>Table Group</span>
+                  </div>
                   <span className="ml-auto text-xs">
                     {availableTables.length} available · {bookedTables.length} booked · {unsuitableTables.length} unsuitable
                   </span>
@@ -332,6 +408,7 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
                     onClick={() => {
                       store.setSeatingChoice(null);
                       store.setSelectedTableId(null);
+                      store.setSelectedGroupId(null);
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                   >
@@ -371,6 +448,15 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
                         opacity={obj.opacity}
                         transform={obj.rotation !== 0 ? `rotate(${obj.rotation} ${obj.x + obj.width / 2} ${obj.y + obj.height / 2})` : undefined}
                         pointerEvents="none"
+                      />
+                    ))}
+                    {/* Table groups rendered BEFORE individual tables */}
+                    {tableGroups.map((group) => (
+                      <GroupShape
+                        key={group.id}
+                        group={group}
+                        isSelected={group.id === store.selectedGroupId}
+                        onClick={() => handleGroupSelect(group)}
                       />
                     ))}
                     {filteredTables.map((table) => (
@@ -420,6 +506,44 @@ export default function TableSelector({ tables, floorObjects = [], partySize, da
                         size="sm"
                         onClick={() => {
                           store.setSelectedTableId(null);
+                          store.setSeatingChoice(null);
+                        }}
+                      >
+                        Change Preference
+                      </Button>
+                      <Button size="sm" onClick={handleConfirmSelection}>
+                        Confirm Table
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected group confirmation */}
+                {selectedGroup && !selectedTable && (
+                  <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-indigo-900">
+                        Selected: {selectedGroup.name} ({selectedGroup.combinedCapacity} seats)
+                      </span>
+                      <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300">
+                        Available
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-indigo-800">
+                      Tables: {selectedGroup.tableIds.map((id) => tables.find((t) => t.id === id)?.name || id).join(' + ')} · {partySize} guests · {format(date, 'EEE d MMM')} at {time}
+                    </p>
+                    <p className="text-xs text-amber-700 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      These tables will be joined and cannot be split for your party.
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          store.setSelectedGroupId(null);
                           store.setSeatingChoice(null);
                         }}
                       >

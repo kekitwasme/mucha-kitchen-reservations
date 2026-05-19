@@ -21,8 +21,10 @@ interface BookingState {
   partySize: number;
   selectedTime: string | null;
   selectedTableId: string | null;
+  selectedGroupId: string | null;
   seatingChoice: 'auto' | 'manual' | null;
   setSelectedTableId: (id: string | null) => void;
+  setSelectedGroupId: (id: string | null) => void;
   setSeatingChoice: (choice: 'auto' | 'manual' | null) => void;
   setStep: (step: BookingStep) => void;
   setDate: (date: Date | undefined) => void;
@@ -37,6 +39,7 @@ const initialBookingState = {
   partySize: 2,
   selectedTime: null,
   selectedTableId: null,
+  selectedGroupId: null,
   seatingChoice: null,
 };
 
@@ -47,7 +50,8 @@ export const useBookingStore = create<BookingState>((set) => ({
   setDate: (date) => set({ date, step: 'party' }),
   setPartySize: (partySize) => set({ partySize, step: 'time' }),
   setSelectedTime: (selectedTime) => set({ selectedTime }),
-  setSelectedTableId: (selectedTableId) => set({ selectedTableId }),
+  setSelectedTableId: (selectedTableId) => set({ selectedTableId, selectedGroupId: null }),
+  setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId, selectedTableId: null }),
   setSeatingChoice: (seatingChoice) => set({ seatingChoice }),
   reset: () => set(initialBookingState),
 }));

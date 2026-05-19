@@ -68,6 +68,19 @@ export interface TableAvailability {
   } | null;
 }
 
+export interface TableGroupAvailability {
+  id: string;
+  name: string;
+  tableIds: string[];
+  combinedCapacity: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  status: TableAvailabilityStatus;
+  suitable: boolean;
+}
+
 // GET /api/tables/availability
 export async function GET(request: NextRequest) {
   try {
@@ -141,6 +154,19 @@ export async function GET(request: NextRequest) {
       orderBy: [{ area: 'asc' }, { name: 'asc' }],
     });
 
+    // Fetch all active table groups with members and their tables
+    const tableGroups = await prisma.tableGroup.findMany({
+      where: { restaurantId: restaurant.id, active: true },
+      include: {
+        groupMembers: {
+          include: {
+            table: true,
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
     // Fetch floor objects for visual context
     const floorObjects = await prisma.floorObject.findMany({
       where: { restaurantId: restaurant.id },
@@ -197,12 +223,59 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Build tableGroups response
+    const tableGroupResults: TableGroupAvailability[] = tableGroups.map((tg) => {
+      const memberTables = tg.groupMembers.map((gm) => gm.table);
+      const tableIds = memberTables.map((t) => t.id);
+
+      // Combined capacity from members (fallback to stored combinedCapacity if needed)
+      const combinedCapacity = memberTables.reduce((sum, t) => sum + t.capacity, 0);
+
+      // Bounding box with 10px padding
+      const minX = Math.min(...memberTables.map((t) => t.x));
+      const minY = Math.min(...memberTables.map((t) => t.y));
+      const maxRight = Math.max(...memberTables.map((t) => t.x + t.width));
+      const maxBottom = Math.max(...memberTables.map((t) => t.y + t.height));
+      const padding = 10;
+      const x = minX - padding;
+      const y = minY - padding;
+      const width = maxRight - minX + padding * 2;
+      const height = maxBottom - minY + padding * 2;
+
+      // Status: available only if ALL members available and suitable
+      const anyBooked = memberTables.some((t) => occupiedTableIds.has(t.id));
+      const suitable = combinedCapacity >= partySize;
+
+      let status: TableAvailabilityStatus;
+      if (!suitable) {
+        status = 'unsuitable';
+      } else if (anyBooked) {
+        status = 'booked';
+      } else {
+        status = 'available';
+      }
+
+      return {
+        id: tg.id,
+        name: tg.name,
+        tableIds,
+        combinedCapacity,
+        x,
+        y,
+        width,
+        height,
+        status,
+        suitable,
+      };
+    });
+
     return NextResponse.json({
       date,
       time,
       partySize,
       turnTimeMinutes: turnTime,
       tables: result,
+      tableGroups: tableGroupResults,
       floorObjects,
     });
   } catch (err) {
