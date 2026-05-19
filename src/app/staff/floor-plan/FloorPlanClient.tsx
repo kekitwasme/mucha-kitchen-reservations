@@ -214,7 +214,7 @@ const FloorObjectShape = React.forwardRef<Konva.Group, FloorObjectShapeProps>(
             }}
             rotateEnabled
             rotationSnaps={[0, 45, 90, 135, 180]}
-            enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+            enabledAnchors={['top-left','top-center','top-right','middle-left','middle-right','bottom-left','bottom-center','bottom-right']}
           />
         )}
       </>
@@ -330,7 +330,7 @@ const TransformableTable = React.forwardRef<Konva.Group, TransformableTableProps
             }}
             rotateEnabled
             rotationSnaps={[0, 15, 30, 45, 60, 75, 90, 135, 180]}
-            enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+            enabledAnchors={['top-left','top-center','top-right','middle-left','middle-right','bottom-left','bottom-center','bottom-right']}
           />
         )}
       </>
