@@ -111,6 +111,9 @@ export async function GET(request: NextRequest) {
       status: true,
       source: true,
       notes: true,
+      // Payment hold fields (needed by staff UI)
+      depositAmount: true,
+      paymentHoldStatus: true,
       reservationTables: {
         include: { table: { select: { id: true, name: true } } },
       },
