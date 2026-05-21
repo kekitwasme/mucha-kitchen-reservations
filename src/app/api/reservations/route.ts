@@ -357,6 +357,9 @@ export async function POST(request: NextRequest) {
             highChairs: highChairs || 0,
             isReturningGuest: isReturningGuest || false,
             guestType: guestType || 'new',
+            paymentHoldRequired: true,
+            paymentHoldStatus: null,
+            holdPlacedAt: null,
             reservationTables: {
               create: candidateTableIds.map((id: string) => ({ tableId: id })),
             },

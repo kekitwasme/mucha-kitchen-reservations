@@ -292,7 +292,7 @@ export default function CancelPage() {
             <p className="text-muted-foreground">
               The reservation for {reservation.customerName} on {reservationDateFormatted} has been cancelled.
             </p>
-            {reservation.depositAmount && reservation.depositAmount > 0 && (
+            {reservation.depositAmount && reservation.depositAmount > 0 ? (
               <div className="bg-white/60 rounded-lg p-3 space-y-1">
                 {holdReleased ? (
                   <>
@@ -309,6 +309,13 @@ export default function CancelPage() {
                     </p>
                   </>
                 )}
+              </div>
+            ) : (
+              <div className="bg-white/60 rounded-lg p-3 space-y-1">
+                <p className="text-sm text-green-600 font-medium">✅ No payment hold was placed</p>
+                <p className="text-xs text-muted-foreground">
+                  No payment hold was on your card, so no further action is needed.
+                </p>
               </div>
             )}
             <Button className="w-full" render={<Link href="/book" />}>

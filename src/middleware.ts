@@ -16,18 +16,21 @@ export default function middleware(req: NextRequest) {
     nextUrl.pathname.startsWith('/confirm') ||
     nextUrl.pathname.startsWith('/cancel') ||
     nextUrl.pathname.startsWith('/reschedule') ||
+    nextUrl.pathname.startsWith('/complete-booking') ||
     nextUrl.pathname === '/login' ||
     nextUrl.pathname.startsWith('/api/auth') ||
     nextUrl.pathname.startsWith('/api/webhooks') ||
     nextUrl.pathname.startsWith('/api/availability') ||
-    nextUrl.pathname.startsWith('/api/tables');
+    nextUrl.pathname.startsWith('/api/tables') ||
+    nextUrl.pathname.startsWith('/api/cron');
 
   // POST /api/reservations (customer booking) and POST /api/reservations/*/cancel are public
   const isPublicReservationAction =
     (nextUrl.pathname === '/api/reservations' && req.method === 'POST') ||
     (/^\/api\/reservations\/[^/]+\/cancel$/.test(nextUrl.pathname) && req.method === 'POST') ||
     (/^\/api\/reservations\/[^/]+\/reschedule$/.test(nextUrl.pathname) && req.method === 'POST') ||
-    (nextUrl.pathname === '/api/payments/hold' && req.method === 'POST');
+    (nextUrl.pathname === '/api/payments/hold' && req.method === 'POST') ||
+    (nextUrl.pathname === '/api/payments/place-hold' && req.method === 'POST');
 
   if (isPublicRoute || isPublicReservationAction) {
     return NextResponse.next();

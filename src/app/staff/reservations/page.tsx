@@ -41,6 +41,9 @@ interface Reservation {
   customerPhone: string;
   notes: string | null;
   reservationTables: { table: { name: string } }[];
+  // Payment hold fields
+  depositAmount?: number;
+  paymentHoldStatus?: string;
 }
 
 // ── Status colors ──────────────────────────────────────────────
@@ -54,7 +57,31 @@ const statusColors: Record<string, string> = {
   no_show: 'bg-red-100 text-red-800 border-red-200',
 };
 
-// ── Action configs ─────────────────────────────────────────────
+// ── Hold status colors ──────────────────────────────────────────
+
+const holdStatusColors: Record<string, string> = {
+  none: 'bg-gray-100 text-gray-700 border-gray-200',
+  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  placed: 'bg-blue-100 text-blue-800 border-blue-200',
+  captured: 'bg-green-100 text-green-800 border-green-200',
+  cancelled: 'bg-red-100 text-red-800 border-red-200',
+  failed: 'bg-red-100 text-red-800 border-red-200',
+};
+
+function getHoldStatusLabel(reservation: Reservation): { label: string; key: string } {
+  if (reservation.status === 'cancelled') {
+    return { label: 'Cancelled', key: 'cancelled' };
+  }
+  if (!reservation.depositAmount || reservation.depositAmount === 0) {
+    return { label: 'No Hold', key: 'none' };
+  }
+  const status = reservation.paymentHoldStatus;
+  if (status === 'requires_capture') return { label: 'Hold Placed', key: 'placed' };
+  if (status === 'captured') return { label: 'Captured', key: 'captured' };
+  if (status === 'canceled') return { label: 'Cancelled', key: 'cancelled' };
+  if (status === 'failed') return { label: 'Failed', key: 'failed' };
+  return { label: 'No Hold', key: 'none' };
+}
 
 interface ActionItem {
   label: string;
@@ -265,13 +292,14 @@ export default function ReservationsPage() {
                 <TableHead>Party</TableHead>
                 <TableHead>Tables</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Hold</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No reservations found
                   </TableCell>
                 </TableRow>
@@ -301,6 +329,19 @@ export default function ReservationsPage() {
                         >
                           {r.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const holdStatus = getHoldStatusLabel(r);
+                          return (
+                            <Badge
+                              variant="outline"
+                              className={holdStatusColors[holdStatus.key] || 'bg-gray-100'}
+                            >
+                              {holdStatus.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div
@@ -374,6 +415,7 @@ export default function ReservationsPage() {
                   <TableHead>Party</TableHead>
                   <TableHead>Tables</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Hold</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -406,6 +448,19 @@ export default function ReservationsPage() {
                         >
                           {r.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const holdStatus = getHoldStatusLabel(r);
+                          return (
+                            <Badge
+                              variant="outline"
+                              className={holdStatusColors[holdStatus.key] || 'bg-gray-100'}
+                            >
+                              {holdStatus.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div

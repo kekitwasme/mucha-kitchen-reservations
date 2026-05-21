@@ -91,6 +91,7 @@ model Restaurant {
   bookingWindowDays  Int      @default(30)
   blockOutHours      Decimal  @default(1.5) @db.Decimal(4,2)
   depositRules       Json?
+  holdHoursBefore    Int      @default(48)
   smsReminderMinutes Int      @default(60)
   squareLocationId   String?
   active             Boolean  @default(true)
@@ -207,6 +208,9 @@ model Reservation {
   depositAmount        Int?
   stripePaymentIntentId String?
   paymentHoldStatus     PaymentHoldStatus?
+  holdPlacedAt         DateTime?
+  holdReminderSent     Boolean           @default(false)
+  paymentHoldRequired  Boolean           @default(true)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 

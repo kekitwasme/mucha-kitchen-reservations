@@ -23,7 +23,7 @@ interface BookingState {
   selectedTableId: string | null;
   selectedGroupId: string | null;
   seatingChoice: 'auto' | 'manual' | null;
-  // Payment state
+  // Payment state (used for complete-booking flow, not initial booking)
   paymentIntentId: string | null;
   clientSecret: string | null;
   holdAmount: number;
@@ -49,6 +49,7 @@ const initialBookingState = {
   selectedTableId: null,
   selectedGroupId: null,
   seatingChoice: null,
+  // Payment fields are kept in store but no longer part of initial booking flow
   paymentIntentId: null,
   clientSecret: null,
   holdAmount: 0,

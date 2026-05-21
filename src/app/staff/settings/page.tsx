@@ -43,6 +43,7 @@ export default function SettingsPage() {
   const [perPersonAmount, setPerPersonAmount] = useState(500); // $5 in cents
   const [autoCapture, setAutoCapture] = useState(false);
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState(30);
+  const [holdHoursBefore, setHoldHoursBefore] = useState(48);
 
   useEffect(() => {
     if (data) {
@@ -57,6 +58,7 @@ export default function SettingsPage() {
         setPerPersonAmount((depositRules.perPersonAmount as number) ?? 500);
         setAutoCapture(!!depositRules.autoCapture);
         setGracePeriodMinutes((depositRules.gracePeriodMinutes as number) ?? 30);
+        setHoldHoursBefore((depositRules.holdHoursBefore as number) ?? 48);
       }
     }
   }, [data]);
@@ -88,6 +90,7 @@ export default function SettingsPage() {
         perPersonAmount,
         autoCapture,
         gracePeriodMinutes,
+        holdHoursBefore,
       },
     });
   };
@@ -152,6 +155,24 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Current: ${(perPersonAmount / 100).toFixed(2)} per person
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Hours Before Reservation to Place Hold</label>
+                <p className="text-xs text-muted-foreground">
+                  How many hours before the reservation time to automatically place the payment hold.
+                </p>
+                <Input
+                  type="number"
+                  value={holdHoursBefore}
+                  onChange={(e) => setHoldHoursBefore(Number(e.target.value))}
+                  min={1}
+                  max={168}
+                  step={1}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Hold will be placed {holdHoursBefore} hours before reservation.
                 </p>
               </div>
 

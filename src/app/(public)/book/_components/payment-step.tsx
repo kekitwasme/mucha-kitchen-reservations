@@ -17,25 +17,27 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 );
 
-interface PaymentStepProps {
+interface CompleteBookingStepProps {
+  reservationId: string;
   clientSecret: string;
   holdAmount: number;
   partySize: number;
   onSuccess: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
 }
 
 /**
  * Stripe PaymentElement form for confirming a pre-auth hold.
  * Wraps PaymentElement in Elements provider.
  */
-export default function PaymentStep({
+export default function CompleteBookingStep({
+  reservationId,
   clientSecret,
   holdAmount,
   partySize,
   onSuccess,
   onCancel,
-}: PaymentStepProps) {
+}: CompleteBookingStepProps) {
   return (
     <Elements
       stripe={stripePromise}
@@ -74,7 +76,7 @@ function PaymentForm({
   holdAmount: number;
   partySize: number;
   onSuccess: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -101,7 +103,7 @@ function PaymentForm({
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/book/confirm`,
+        return_url: `${window.location.origin}/confirm`,
       },
       redirect: 'if_required',
     });
@@ -123,25 +125,29 @@ function PaymentForm({
   return (
     <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CardHeader>
-        <CardTitle className="text-center">Secure Your Booking</CardTitle>
+        <CardTitle className="text-center">Complete Your Booking</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Hold info */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Hold amount</span>
-            <span className="text-lg font-semibold">{formattedAmount}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Per person</span>
-            <span className="text-sm">{perPerson}</span>
-          </div>
-          <div className="border-t pt-2 mt-2">
-            <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
+            To secure your reservation, please provide your card details.
+            A <strong>{formattedAmount}</strong> hold will be placed on your card.
+          </p>
+          <div className="border-t pt-2 mt-2 space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Hold amount</span>
+              <span className="text-lg font-semibold">{formattedAmount}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Per person</span>
+              <span className="text-sm">{perPerson}</span>
+            </div>
+            <p className="text-sm text-muted-foreground pt-1">
               Your card will be held, not charged. You will only be charged if you
               don&apos;t show up for your reservation.
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Cancel at least 2 hours before your reservation to avoid any charges.
             </p>
           </div>
@@ -160,15 +166,17 @@ function PaymentForm({
           )}
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={isLoading}
-              className="w-full sm:w-auto sm:flex-1 h-12"
-            >
-              Back
-            </Button>
+            {onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isLoading}
+                className="w-full sm:w-auto sm:flex-1 h-12"
+              >
+                Back
+              </Button>
+            )}
             <Button
               type="submit"
               disabled={!stripe || isLoading}

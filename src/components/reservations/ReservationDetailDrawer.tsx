@@ -189,6 +189,29 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
     },
   });
 
+  // Payment place-hold mutation (manual trigger)
+  const placeHoldMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/payments/place-hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId: id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to place hold');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservation', reservationId] });
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    },
+    onError: (error: Error) => {
+      setCaptureError(error.message);
+    },
+  });
+
   // Payment release mutation (for staff cancellation or seated)
   const releaseMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -453,7 +476,7 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
               </div>
 
               {/* Payment Hold Info */}
-              {detail.depositAmount && detail.depositAmount > 0 && (
+              {detail.depositAmount && detail.depositAmount > 0 ? (
                 <div className="col-span-2 bg-blue-50/50 dark:bg-blue-950/30 rounded-lg p-3 space-y-2 border border-blue-200 dark:border-blue-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Payment Hold</span>
@@ -508,7 +531,32 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
                     <p className="text-sm text-gray-500">Hold released — no charges</p>
                   )}
                 </div>
-              )}
+              ) : detail.status !== 'cancelled' ? (
+                /* Hold Pending state */
+                <div className="col-span-2 bg-amber-50/50 dark:bg-amber-950/30 rounded-lg p-3 space-y-2 border border-amber-200 dark:border-amber-900">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-amber-900 dark:text-amber-300">Payment Hold</span>
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                      Hold Pending
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Hold will be placed automatically 48 hours before reservation.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => placeHoldMutation.mutate(detail.id)}
+                    disabled={placeHoldMutation.isPending}
+                    className="mt-1"
+                  >
+                    {placeHoldMutation.isPending ? 'Placing hold...' : 'Place Hold Now'}
+                  </Button>
+                  {placeHoldMutation.isError && (
+                    <p className="text-sm text-red-600">{placeHoldMutation.error.message}</p>
+                  )}
+                </div>
+              ) : null}
 
               {/* Notes — full width */}
               {detail.notes && (

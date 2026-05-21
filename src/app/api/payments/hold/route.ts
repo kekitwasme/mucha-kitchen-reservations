@@ -41,10 +41,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if hold already exists
-    if (reservation.stripePaymentIntentId) {
+    if (reservation.stripePaymentIntentId || reservation.paymentHoldStatus) {
       return NextResponse.json(
         { error: 'Payment hold already exists for this reservation' },
         { status: 409 }
+      );
+    }
+
+    // If reservation is more than 7 days away, reject direct hold placement
+    // (deferred holds should be placed by cron instead)
+    const now = new Date();
+    const daysUntilReservation = (reservation.startTime.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysUntilReservation > 7) {
+      return NextResponse.json(
+        { error: 'Hold cannot be placed more than 7 days in advance' },
+        { status: 400 }
       );
     }
 
@@ -75,6 +86,7 @@ export async function POST(request: NextRequest) {
       data: {
         stripePaymentIntentId: holdResult.paymentIntentId,
         paymentHoldStatus: 'requires_capture',
+        holdPlacedAt: new Date(),
         depositAmount: holdAmount,
       },
     });

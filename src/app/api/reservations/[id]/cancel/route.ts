@@ -60,8 +60,8 @@ export async function POST(
       },
     });
 
-    // Release Stripe hold if cancelled >=2h before reservation
-    if (existing.stripePaymentIntentId && existing.paymentHoldStatus === 'requires_capture' && !isWithinTwoHours) {
+    // Release Stripe hold if one exists and is in requires_capture state
+    if (existing.stripePaymentIntentId && existing.paymentHoldStatus === 'requires_capture') {
       const releaseResult = await releaseHold(existing.stripePaymentIntentId);
       if (releaseResult.success) {
         await prisma.reservation.update({
@@ -83,6 +83,12 @@ export async function POST(
           },
         });
       }
+    } else if (!existing.stripePaymentIntentId && !existing.paymentHoldStatus && !existing.holdPlacedAt) {
+      // No Stripe interaction needed — hold was never placed (e.g. deferred hold, far-future reservation)
+      console.log(`[Cancel] Reservation ${id} has no hold to release. Skipping Stripe.`);
+    } else if (existing.paymentHoldStatus === 'captured') {
+      // Already a charge — refund is out of scope, log for manual handling
+      console.warn(`[Cancel] Reservation ${id} has a captured payment. Refund must be handled manually.`);
     }
 
     // Async Square cancel
@@ -98,7 +104,9 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      holdReleased: !isWithinTwoHours && existing.paymentHoldStatus === 'requires_capture',
+      holdReleased:
+        existing.stripePaymentIntentId != null &&
+        existing.paymentHoldStatus === 'requires_capture',
       isWithinTwoHours,
     });
   } catch (err) {
