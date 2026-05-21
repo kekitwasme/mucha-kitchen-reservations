@@ -170,7 +170,7 @@ export default function ConfirmPage() {
             </div>
             <Button className="w-full mt-4" render={<Link href="/book" />}>
               <CalendarPlus className="mr-2 h-4 w-4" />
-              Add to Calendar
+              Book another table
             </Button>
           </CardContent>
         </Card>
@@ -261,7 +261,7 @@ export default function ConfirmPage() {
               <p className="font-medium text-green-900 dark:text-green-300">Reservation Secured</p>
             </div>
             <p className="text-sm text-green-800/80 dark:text-green-400">
-              Your card has been saved securely. A payment hold will be placed automatically 24–48 hours before your reservation.
+              Your card has been saved securely. If your reservation starts within 24 hours, a payment hold may be placed now; otherwise it will be placed automatically 24-48 hours before your reservation.
             </p>
             <p className="text-sm text-green-800/80 dark:text-green-400">
               Cancel at least 2 hours before your reservation to avoid any charges.
@@ -286,7 +286,7 @@ export default function ConfirmPage() {
       <div className="flex flex-col gap-3">
         <Button className="w-full" render={<Link href="/book" />}>
           <CalendarPlus className="mr-2 h-4 w-4" />
-          Add to Calendar
+          Book another table
         </Button>
         {!isTerminal && (
           <div className="relative">

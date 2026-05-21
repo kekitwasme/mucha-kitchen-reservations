@@ -25,6 +25,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (urlError) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(
         urlError === 'CredentialsSignin'
           ? 'Invalid credentials'
@@ -38,7 +39,7 @@ function LoginForm() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <div className="flex flex-col items-center gap-3">
-            <Image src="/logo.png" alt="Mucha Kitchen" width={48} height={48} className="h-12 w-12" />
+            <Image src="/logo.png" alt="Mucha Kitchen" width={1134} height={823} className="h-12 w-auto" />
             <CardTitle>Staff Login</CardTitle>
           </div>
         </CardHeader>

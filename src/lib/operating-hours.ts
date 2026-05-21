@@ -10,6 +10,7 @@
  * @module operating-hours
  * @see {@link ./table-assignment.ts} — slot generation engine
  */
+import type { PrismaClient } from '@prisma/client';
 
 export interface OperatingSegment {
   label?: string;
@@ -77,7 +78,7 @@ export function getDayOfWeekName(date: Date): string {
 export async function getOperatingSegments(
   restaurantId: string,
   date: Date,
-  prisma: any // PrismaClient
+  prisma: PrismaClient
 ): Promise<{ segments: OperatingSegment[]; fromSpecial: boolean }> {
   const dateStr = date.toISOString().split('T')[0];
 
@@ -90,7 +91,7 @@ export async function getOperatingSegments(
     if (special.isClosed) {
       return { segments: [], fromSpecial: true };
     }
-    const segments = (special.segments as OperatingSegment[]) || [];
+    const segments = (special.segments as unknown as OperatingSegment[]) || [];
     return { segments, fromSpecial: true };
   }
 
@@ -100,7 +101,7 @@ export async function getOperatingSegments(
     orderBy: { sortOrder: 'asc' },
   });
 
-  const segments: OperatingSegment[] = rules.map((r: any) => ({
+  const segments: OperatingSegment[] = rules.map((r) => ({
     label: r.label || undefined,
     startTime: r.startTime,
     endTime: r.endTime,

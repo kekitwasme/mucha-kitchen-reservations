@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Line } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Transformer, Line } from 'react-konva';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +63,32 @@ interface OptimizeResult {
   singleTables: { id: string; name: string; capacity: number; shape: string; area: string; x: number; y: number }[];
   combinations: { tableA: { id: string; name: string; capacity: number; x: number; y: number }; tableB: { id: string; name: string; capacity: number; x: number; y: number }; combinedCapacity: number; distance: number; isSuggested: boolean }[];
   groups: { id: string; name: string; combinedCapacity: number; tables: { id: string; name: string; capacity: number; x: number; y: number }[] }[];
+}
+
+interface TableGroupMemberApi {
+  table: { id: string; name: string; capacity: number; x: number; y: number };
+}
+
+interface TableGroupApi {
+  id: string;
+  name: string;
+  combinedCapacity: number;
+  groupMembers: TableGroupMemberApi[];
+}
+
+interface ReservationTableApi {
+  tableId?: string;
+  table?: { id: string };
+}
+
+interface ReservationApi {
+  id: string;
+  customerName: string;
+  partySize: number;
+  startTime: string;
+  endTime: string;
+  status: string;
+  reservationTables?: ReservationTableApi[];
 }
 
 type TableStatus = 'available' | 'reserved' | 'occupied';
@@ -687,13 +713,13 @@ function FindTablePanel({
         body: JSON.stringify({ partySize }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as OptimizeResult;
         setResult(data);
         // Highlight all available table IDs
         const ids = [
-          ...data.singleTables.map((t: any) => t.id),
-          ...data.combinations.flatMap((c: any) => [c.tableA.id, c.tableB.id]),
-          ...data.groups.flatMap((g: any) => g.tables.map((t: any) => t.id)),
+          ...data.singleTables.map((t) => t.id),
+          ...data.combinations.flatMap((c) => [c.tableA.id, c.tableB.id]),
+          ...data.groups.flatMap((g) => g.tables.map((t) => t.id)),
         ];
         onHighlight(ids);
       }
@@ -763,7 +789,10 @@ export default function FloorPlanPage() {
   const tableRefs = useRef<Map<string, Konva.Group>>(new Map());
   const objectRefs = useRef<Map<string, Konva.Group>>(new Map());
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const updateSize = () => { if (containerRef.current) setContainerWidth(containerRef.current.offsetWidth); };
@@ -793,9 +822,9 @@ export default function FloorPlanPage() {
     fetch('/api/table-groups')
       .then((r) => r.json())
       .then((data) => {
-        const groups = (data.groups || []).map((g: any) => ({
+        const groups = ((data.groups || []) as TableGroupApi[]).map((g) => ({
           id: g.id, name: g.name, combinedCapacity: g.combinedCapacity,
-          tables: g.groupMembers.map((m: any) => ({ id: m.table.id, name: m.table.name, capacity: m.table.capacity, x: m.table.x, y: m.table.y })),
+          tables: g.groupMembers.map((m) => ({ id: m.table.id, name: m.table.name, capacity: m.table.capacity, x: m.table.x, y: m.table.y })),
         }));
         setTableGroups(groups);
       })
@@ -805,6 +834,7 @@ export default function FloorPlanPage() {
   // Fetch reservations for preview mode
   useEffect(() => {
     if (store.viewMode !== 'preview') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviewReservations([]);
       return;
     }
@@ -818,21 +848,21 @@ export default function FloorPlanPage() {
         selectedDateObj.setHours(selectedHour, selectedMin, 0, 0);
         const selectedTime = selectedDateObj.getTime();
         // Filter to reservations that overlap the selected time
-        const overlapping = (data.reservations || [])
-          .filter((r: any) => {
+        const overlapping = ((data.reservations || []) as ReservationApi[])
+          .filter((r) => {
             if (['cancelled', 'no_show'].includes(r.status)) return false;
             const start = new Date(r.startTime).getTime();
             const end = new Date(r.endTime).getTime();
             return start <= selectedTime && end > selectedTime;
           })
-          .map((r: any) => ({
+          .map((r) => ({
             id: r.id,
             customerName: r.customerName,
             partySize: r.partySize,
             startTime: r.startTime,
             endTime: r.endTime,
             status: r.status,
-            tableIds: (r.reservationTables || []).map((rt: any) => rt.tableId || rt.table?.id),
+            tableIds: (r.reservationTables || []).map((rt) => rt.tableId || rt.table?.id).filter((id): id is string => Boolean(id)),
           }));
         setPreviewReservations(overlapping);
       })
@@ -1013,7 +1043,7 @@ export default function FloorPlanPage() {
         const g = data.group;
         setTableGroups((prev) => [...prev, {
           id: g.id, name: g.name, combinedCapacity: g.combinedCapacity,
-          tables: g.groupMembers.map((m: any) => ({ id: m.table.id, name: m.table.name, capacity: m.table.capacity, x: m.table.x, y: m.table.y })),
+          tables: (g.groupMembers as TableGroupMemberApi[]).map((m) => ({ id: m.table.id, name: m.table.name, capacity: m.table.capacity, x: m.table.x, y: m.table.y })),
         }]);
       } else { alert('Failed to create group.'); }
     } catch { alert('Failed to create group.'); }
@@ -1083,7 +1113,7 @@ export default function FloorPlanPage() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [store.isEditMode, selectedTableId, selectedObjectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleStageClick = (e: any) => {
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     if (e.target === e.target.getStage() || e.target.getClassName() === 'Line') {
       setSelectedTableId(null);
       setSelectedObjectId(null);
@@ -1220,7 +1250,7 @@ export default function FloorPlanPage() {
             onClick={handleStageClick}
             onTap={handleStageClick}
             onTouchEnd={() => { lastDist.current = null; }}
-            onTouchMove={(e: any) => {
+            onTouchMove={(e: Konva.KonvaEventObject<TouchEvent>) => {
               const t1 = e.evt.touches[0];
               const t2 = e.evt.touches[1];
               if (!t1 || !t2) return;

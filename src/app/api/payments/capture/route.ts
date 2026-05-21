@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { captureHold } from '@/lib/stripe';
+import { requireStaffSession } from '@/lib/api-auth';
 import { z } from 'zod';
 
 const captureSchema = z.object({
@@ -14,6 +15,9 @@ const captureSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const { session, response } = await requireStaffSession();
+    if (response) return response;
+
     const body = await request.json();
     const parsed = captureSchema.safeParse(body);
 
@@ -34,6 +38,10 @@ export async function POST(request: NextRequest) {
 
     if (!reservation) {
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
+    }
+
+    if (reservation.restaurantId !== session.user.restaurantId) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     if (!reservation.stripePaymentIntentId) {
@@ -60,43 +68,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update reservation
-    await prisma.reservation.update({
-      where: { id: reservationId },
-      data: {
-        paymentHoldStatus: 'captured',
-      },
-    });
+    const existingPayment = reservation.payments.find(
+      (payment) => payment.stripePaymentIntentId === reservation.stripePaymentIntentId
+    );
 
-    // Update payment record
-    await prisma.payment.updateMany({
-      where: {
-        reservationId,
-        stripePaymentIntentId: reservation.stripePaymentIntentId,
-      },
-      data: {
-        status: 'completed',
-        type: 'no_show_fee',
-        metadata: {
-          capturedAt: new Date().toISOString(),
-          capturedAmount: result.capturedAmount,
+    await prisma.$transaction([
+      prisma.reservation.update({
+        where: { id: reservationId },
+        data: {
+          paymentHoldStatus: 'captured',
         },
-      },
-    });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        restaurantId: reservation.restaurantId,
-        reservationId,
-        action: 'payment_received',
-        details: {
-          type: 'no_show_fee_capture',
-          amount: reservation.depositAmount,
-          paymentIntentId: reservation.stripePaymentIntentId,
+      }),
+      prisma.payment.updateMany({
+        where: {
+          reservationId,
+          stripePaymentIntentId: reservation.stripePaymentIntentId,
         },
-      },
-    });
+        data: {
+          status: 'completed',
+          type: 'no_show_fee',
+          metadata: {
+            ...((existingPayment?.metadata as Record<string, unknown> | null) ?? {}),
+            capturedAt: new Date().toISOString(),
+            capturedAmount: result.capturedAmount,
+          },
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: reservation.restaurantId,
+          reservationId,
+          action: 'payment_received',
+          details: {
+            type: 'no_show_fee_capture',
+            amount: reservation.depositAmount,
+            paymentIntentId: reservation.stripePaymentIntentId,
+          },
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,

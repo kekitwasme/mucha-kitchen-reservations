@@ -24,11 +24,19 @@ import { ReservationStatus, ReservationSource } from '@prisma/client';
 
 const RESTAURANT_ID = process.env.RESTAURANT_ID || '';
 
+/**
+ * Builds a consistent JSON error response for reservation collection routes.
+ */
 function errorResponse(error: string, code: string, status: number, details?: unknown) {
   return NextResponse.json({ error, code, ...(details ? { details } : {}) }, { status });
 }
 
-// GET /api/reservations — List with filters
+/**
+ * GET /api/reservations
+ *
+ * Lists reservations for staff views with optional filtering, plus a compact
+ * future-active list used by dashboard/sidebar experiences.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -150,7 +158,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/reservations — Create with transaction
+/**
+ * POST /api/reservations
+ *
+ * Creates a reservation inside a serializable transaction, assigns tables,
+ * stores any Stripe setup metadata passed by the caller, and starts best-effort
+ * Square sync after the reservation is committed.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -179,6 +193,7 @@ export async function POST(request: NextRequest) {
       status: requestedStatus,
       stripeSetupIntentId,
       stripeCustomerId,
+      stripePaymentMethodId,
     } = parsed.data;
 
     const restaurant = RESTAURANT_ID
@@ -367,6 +382,7 @@ export async function POST(request: NextRequest) {
             holdPlacedAt: null,
             stripeSetupIntentId: stripeSetupIntentId || null,
             stripeCustomerId: stripeCustomerId || null,
+            stripePaymentMethodId: stripePaymentMethodId || null,
             reservationTables: {
               create: candidateTableIds.map((id: string) => ({ tableId: id })),
             },

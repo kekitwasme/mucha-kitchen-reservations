@@ -27,7 +27,9 @@ interface PaymentStepProps {
 
 /**
  * Stripe PaymentElement form for saving card details via SetupIntent.
- * Wraps PaymentElement in Elements provider.
+ *
+ * Wraps PaymentElement in Elements and passes the saved payment method back to
+ * the reservation API so near-term bookings can receive an immediate hold.
  */
 export default function PaymentStep({
   reservationId,
@@ -67,6 +69,13 @@ export default function PaymentStep({
   );
 }
 
+/**
+ * Renders the card-saving form and finalizes the reservation payment metadata.
+ *
+ * On successful SetupIntent confirmation it patches the reservation with the
+ * SetupIntent, customer, and payment method IDs. The server then decides whether
+ * the booking qualifies for an immediate hold.
+ */
 function PaymentForm({
   reservationId,
   setupIntentId,
@@ -118,6 +127,9 @@ function PaymentForm({
 
     // Use the setupIntent ID from the response if available, otherwise fall back to the prop
     const confirmedSetupIntentId = setupIntent?.id || setupIntentId;
+    const paymentMethod = setupIntent?.payment_method;
+    const stripePaymentMethodId =
+      typeof paymentMethod === 'string' ? paymentMethod : paymentMethod?.id;
 
     // SetupIntent confirmed — update reservation with SetupIntent ID and Customer ID
     try {
@@ -127,6 +139,7 @@ function PaymentForm({
         body: JSON.stringify({
           stripeSetupIntentId: confirmedSetupIntentId,
           stripeCustomerId,
+          stripePaymentMethodId,
         }),
       });
 
@@ -158,7 +171,7 @@ function PaymentForm({
           </p>
           <div className="border-t pt-2 mt-2 space-y-1">
             <p className="text-sm text-muted-foreground">
-              Your card details will be saved securely. A hold may be placed 24–48 hours before your reservation.
+              Your card details will be saved securely. If your reservation starts within 24 hours, a hold may be placed now; otherwise it may be placed 24-48 hours before your reservation.
             </p>
             <p className="text-sm text-muted-foreground">
               Cancel at least 2 hours before your reservation to avoid any charges.

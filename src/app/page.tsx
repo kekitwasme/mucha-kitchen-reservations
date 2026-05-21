@@ -8,7 +8,7 @@ export default function Home() {
       <header className="border-b bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <Image src="/logo.png" alt="Mucha Kitchen" width={28} height={28} className="h-7 w-7" />
+            <Image src="/logo.png" alt="Mucha Kitchen" width={1134} height={823} className="h-7 w-auto" />
             Mucha Kitchen
           </h1>
           <nav className="flex items-center gap-2 sm:gap-4">
@@ -22,7 +22,7 @@ export default function Home() {
 
       <main className="flex-1 flex items-center justify-center bg-slate-50 px-4">
         <div className="text-center space-y-6">
-          <Image src="/logo.png" alt="Mucha Kitchen" width={120} height={120} className="h-24 w-24 sm:h-28 sm:w-28 mx-auto" />
+          <Image src="/logo.png" alt="Mucha Kitchen" width={1134} height={823} className="mx-auto h-24 w-auto sm:h-28" />
           <h2 className="text-3xl sm:text-4xl font-bold">Mucha Kitchen Table Reservations</h2>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto">
             Manage tables, reservations, and floor plans with real-time availability.

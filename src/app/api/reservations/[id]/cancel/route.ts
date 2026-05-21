@@ -7,7 +7,12 @@ function errorResponse(error: string, code: string, status: number) {
   return NextResponse.json({ error, code }, { status });
 }
 
-// POST /api/reservations/[id]/cancel — Public cancellation endpoint (no auth required)
+/**
+ * Public customer cancellation endpoint.
+ *
+ * If a releasable Stripe hold exists, it is released before the reservation is
+ * marked cancelled so we do not leave a cancelled booking with an active hold.
+ */
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -38,37 +43,41 @@ export async function POST(
     const startTime = new Date(existing.startTime);
     const hoursUntilReservation = (startTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     const isWithinTwoHours = hoursUntilReservation <= 2;
+    let holdReleased = false;
 
-    // Update status to cancelled
-    await prisma.reservation.update({
-      where: { id },
-      data: { status: 'cancelled' },
-    });
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        restaurantId: existing.restaurantId,
-        reservationId: id,
-        action: 'cancelled',
-        details: {
-          previousStatus: existing.status,
-          cancelledBy: 'customer',
-          hoursUntilReservation: Math.round(hoursUntilReservation * 10) / 10,
-          isWithinTwoHours,
-        },
-      },
-    });
-
-    // Release Stripe hold if one exists and is in requires_capture state
     if (existing.stripePaymentIntentId && existing.paymentHoldStatus === 'requires_capture') {
       const releaseResult = await releaseHold(existing.stripePaymentIntentId);
-      if (releaseResult.success) {
-        await prisma.reservation.update({
-          where: { id },
-          data: { paymentHoldStatus: 'canceled' },
+
+      if (!releaseResult.success) {
+        console.error('[Cancel] Failed to release payment hold:', releaseResult.error);
+        return errorResponse('Failed to release payment hold. Please call the restaurant.', 'HOLD_RELEASE_FAILED', 502);
+      }
+
+      holdReleased = true;
+    } else if (!existing.stripePaymentIntentId && !existing.paymentHoldStatus && !existing.holdPlacedAt) {
+      console.log(`[Cancel] Reservation ${id} has no hold to release. Skipping Stripe.`);
+    } else if (existing.paymentHoldStatus === 'captured') {
+      console.warn(`[Cancel] Reservation ${id} has a captured payment. Refund must be handled manually.`);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.reservation.update({
+        where: { id },
+        data: {
+          status: 'cancelled',
+          ...(holdReleased ? { paymentHoldStatus: 'canceled' as const } : {}),
+        },
+      });
+
+      if (holdReleased && existing.stripePaymentIntentId) {
+        const payment = await tx.payment.findFirst({
+          where: {
+            reservationId: id,
+            stripePaymentIntentId: existing.stripePaymentIntentId,
+          },
         });
-        await prisma.payment.updateMany({
+
+        await tx.payment.updateMany({
           where: {
             reservationId: id,
             stripePaymentIntentId: existing.stripePaymentIntentId,
@@ -76,6 +85,7 @@ export async function POST(
           data: {
             status: 'refunded',
             metadata: {
+              ...((payment?.metadata as Record<string, unknown> | null) ?? {}),
               releasedAt: new Date().toISOString(),
               reason: 'customer_cancel',
               hoursBeforeReservation: Math.round(hoursUntilReservation * 10) / 10,
@@ -83,13 +93,22 @@ export async function POST(
           },
         });
       }
-    } else if (!existing.stripePaymentIntentId && !existing.paymentHoldStatus && !existing.holdPlacedAt) {
-      // No Stripe interaction needed — hold was never placed (e.g. deferred hold, far-future reservation)
-      console.log(`[Cancel] Reservation ${id} has no hold to release. Skipping Stripe.`);
-    } else if (existing.paymentHoldStatus === 'captured') {
-      // Already a charge — refund is out of scope, log for manual handling
-      console.warn(`[Cancel] Reservation ${id} has a captured payment. Refund must be handled manually.`);
-    }
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: existing.restaurantId,
+          reservationId: id,
+          action: 'cancelled',
+          details: {
+            previousStatus: existing.status,
+            cancelledBy: 'customer',
+            hoursUntilReservation: Math.round(hoursUntilReservation * 10) / 10,
+            isWithinTwoHours,
+            holdReleased,
+          },
+        },
+      });
+    });
 
     // Async Square cancel
     if (existing.squareBookingId) {
@@ -104,9 +123,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      holdReleased:
-        existing.stripePaymentIntentId != null &&
-        existing.paymentHoldStatus === 'requires_capture',
+      holdReleased,
       isWithinTwoHours,
     });
   } catch (err) {

@@ -57,7 +57,6 @@ export default function ReschedulePage() {
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   // Fetch reservation
   const { data, isLoading, isError } = useQuery({
@@ -263,7 +262,7 @@ export default function ReschedulePage() {
           </CardHeader>
           <CardContent>
             {loadingSlots ? (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="h-12 bg-muted animate-pulse rounded" />
                 ))}
@@ -273,7 +272,7 @@ export default function ReschedulePage() {
                 No available times for this date. Try another date.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {slots.map((slot: AvailabilitySlot) => {
                   const isSelected = selectedTime === slot.startTime;
                   const isCurrentTime =

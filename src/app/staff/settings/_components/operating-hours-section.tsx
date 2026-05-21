@@ -75,6 +75,7 @@ export default function OperatingHoursSection() {
           end: s.end,
         }));
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSegmentsByDay(initial);
     }
   }, [data]);

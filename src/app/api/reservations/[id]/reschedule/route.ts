@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { getTurnTime, combineDateTime } from '@/lib/utils';
-import { findAvailableTables } from '@/lib/table-assignment';
+import { assignTables } from '@/lib/table-assignment';
+import { getOperatingSegments, timeToMinutes } from '@/lib/operating-hours';
 
 function errorResponse(error: string, code: string, status: number, details?: unknown) {
   return NextResponse.json({ error, code, ...(details ? { details } : {}) }, { status });
+}
+
+/**
+ * Returns true when a reservation window is fully inside one operating segment.
+ */
+function isWithinOperatingSegments(startTime: string, endTime: Date, segments: { startTime: string; endTime: string }[]) {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = endTime.getHours() * 60 + endTime.getMinutes();
+
+  return segments.some((segment) => (
+    startMinutes >= timeToMinutes(segment.startTime) &&
+    endMinutes <= timeToMinutes(segment.endTime)
+  ));
 }
 
 const rescheduleSchema = z.object({
@@ -13,7 +27,13 @@ const rescheduleSchema = z.object({
   startTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'Invalid time format (HH:MM)'),
 });
 
-// POST /api/reservations/[id]/reschedule — Public endpoint for customers to change their reservation time
+/**
+ * Public endpoint for customers to move an existing reservation to a new slot.
+ *
+ * It applies the same operating-hour and block-out constraints as new bookings,
+ * then uses the assignment engine so the reservation receives the smallest
+ * suitable table or table group instead of every currently available table.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -63,16 +83,32 @@ export async function POST(
       return errorResponse('Cannot reschedule to a past time', 'PAST_TIME', 400);
     }
 
-    // Find available tables, excluding the current reservation from conflict checks
+    const daysAhead = Math.ceil((startDateTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysAhead > restaurant.bookingWindowDays) {
+      return errorResponse('Date is outside the booking window', 'OUTSIDE_BOOKING_WINDOW', 400);
+    }
+
+    const hoursUntilReservation = (startDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursUntilReservation < Number(restaurant.blockOutHours)) {
+      return errorResponse('This time is inside the restaurant block-out window', 'BLOCK_OUT_WINDOW', 400);
+    }
+
+    const { segments } = await getOperatingSegments(existing.restaurantId, dateObj, prisma);
+    if (!isWithinOperatingSegments(startTime, endDateTime, segments)) {
+      return errorResponse('The restaurant is not open for this full reservation time', 'OUTSIDE_OPERATING_HOURS', 400);
+    }
+
     const currentTableIds = existing.reservationTables.map((rt) => rt.tableId);
-    const assignment = await findAvailableTables(
+    const assignment = await assignTables(
       existing.restaurantId,
+      partySize,
       startDateTime,
       endDateTime,
-      existing.id // exclude current reservation from conflict checks
+      currentTableIds,
+      existing.id
     );
 
-    if (!assignment || assignment.tables.length === 0) {
+    if (!assignment) {
       return errorResponse('No tables available at this time', 'NO_AVAILABILITY', 409);
     }
 
@@ -85,9 +121,9 @@ export async function POST(
 
       // Create new table assignments
       await tx.reservationTable.createMany({
-        data: assignment.tables.map((table) => ({
+        data: assignment.tableIds.map((tableId) => ({
           reservationId: existing.id,
-          tableId: table.id,
+          tableId,
         })),
       });
 
@@ -117,7 +153,7 @@ export async function POST(
             newDate: reservationDate,
             newTime: startTime,
             previousTableIds: currentTableIds,
-            newTableIds: assignment.tables.map((t) => t.id),
+            newTableIds: assignment.tableIds,
           },
         },
       });

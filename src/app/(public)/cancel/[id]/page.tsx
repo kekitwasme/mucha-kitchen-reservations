@@ -189,7 +189,7 @@ export default function CancelPage() {
             </div>
             <Button className="w-full mt-4" render={<Link href="/book" />}>
               <CalendarPlus className="mr-2 h-4 w-4" />
-              Add to Calendar
+              Book another table
             </Button>
           </CardContent>
         </Card>
@@ -320,7 +320,7 @@ export default function CancelPage() {
             )}
             <Button className="w-full" render={<Link href="/book" />}>
               <CalendarPlus className="mr-2 h-4 w-4" />
-              Add to Calendar
+              Book another table
             </Button>
           </CardContent>
         </Card>

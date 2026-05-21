@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyStripeWebhookSignature } from '@/lib/stripe';
+import { placeImmediateHoldIfNeeded } from '@/lib/payment-holds';
 
 /**
  * POST /api/webhooks/stripe
+ *
  * Receives Stripe webhook events for PaymentIntent status changes
  * and SetupIntent completion.
  *
@@ -82,7 +84,11 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Handle setup_intent.succeeded — store the saved payment method on the reservation.
+ * Handles setup_intent.succeeded.
+ *
+ * Stores the saved customer/payment method IDs on the reservation, writes an
+ * audit entry, and attempts the immediate-hold path for bookings within 24
+ * hours of reservation start.
  */
 async function handleSetupIntentSucceeded(
   setupIntent: {
@@ -149,6 +155,13 @@ async function handleSetupIntentSucceeded(
     console.log(
       `[Stripe Webhook] Updated reservation ${reservation.id} with saved payment method ${paymentMethodId}`
     );
+
+    const holdResult = await placeImmediateHoldIfNeeded(reservation.id, 'setup_intent_webhook');
+    if (holdResult.status === 'failed') {
+      console.error(
+        `[Stripe Webhook] Immediate hold failed for reservation ${reservation.id}: ${holdResult.reason}`
+      );
+    }
   } catch (error) {
     console.error('[Stripe Webhook] handleSetupIntentSucceeded failed:', error);
   }
@@ -156,6 +169,9 @@ async function handleSetupIntentSucceeded(
 
 /**
  * Update reservation and payment records based on Stripe webhook events.
+ *
+ * Keeps local reservation hold state and the related payment record aligned
+ * with Stripe PaymentIntent lifecycle changes.
  */
 async function updatePaymentHoldStatus(
   paymentIntentId: string,

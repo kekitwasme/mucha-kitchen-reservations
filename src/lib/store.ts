@@ -18,7 +18,7 @@ export type BookingStep = 'date' | 'party' | 'time' | 'details' | 'payment' | 'c
 interface BookingState {
   step: BookingStep;
   date: Date | undefined;
-  partySize: number;
+  partySize: number | null;
   selectedTime: string | null;
   selectedTableId: string | null;
   selectedGroupId: string | null;
@@ -49,7 +49,7 @@ interface BookingState {
 const initialBookingState = {
   step: 'date' as BookingStep,
   date: undefined,
-  partySize: 2,
+  partySize: null,
   selectedTime: null,
   selectedTableId: null,
   selectedGroupId: null,

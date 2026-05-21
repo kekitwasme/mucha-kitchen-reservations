@@ -105,6 +105,7 @@ export default function EditReservationModal({
   // Populate form from fetched data
   useEffect(() => {
     if (detailData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(detailData.customerName);
       setPhone(detailData.customerPhone);
       setEmail(detailData.customerEmail ?? '');

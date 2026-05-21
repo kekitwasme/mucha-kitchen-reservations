@@ -1,19 +1,19 @@
-import Image from 'next/image';
-
 export default function PublicLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <>
-      <header className="border-b bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-3 flex items-center gap-3">
-          <Image src="/logo.png" alt="Mucha Kitchen" width={36} height={36} className="h-9 w-9" />
-          <span className="text-lg font-bold">Mucha Kitchen Reservations</span>
+    <div className="min-h-screen bg-muted/20">
+      <header className="border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-3 text-center sm:px-6">
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold leading-tight sm:text-lg">Mucha Kitchen</p>
+            <p className="text-xs text-muted-foreground">Reservations</p>
+          </div>
         </div>
       </header>
-      {children}
-    </>
+      <main>{children}</main>
+    </div>
   );
 }

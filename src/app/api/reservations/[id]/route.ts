@@ -4,12 +4,21 @@ import { prisma } from '@/lib/prisma';
 import { updateReservationSchema } from '@/lib/schemas';
 import { getTurnTime, combineDateTime } from '@/lib/utils';
 import { cancelSquareBooking, updateSquareBooking } from '@/lib/square-adapter';
+import { placeImmediateHoldIfNeeded } from '@/lib/payment-holds';
 
+/**
+ * Builds a consistent JSON error response for reservation detail routes.
+ */
 function errorResponse(error: string, code: string, status: number, details?: unknown) {
   return NextResponse.json({ error, code, ...(details ? { details } : {}) }, { status });
 }
 
-// GET /api/reservations/[id] — Get reservation detail
+/**
+ * GET /api/reservations/[id]
+ *
+ * Returns a reservation with tables, payments, audit history, and restaurant
+ * contact details formatted for public confirmation and staff views.
+ */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -56,7 +65,14 @@ export async function GET(
   }
 }
 
-// PATCH /api/reservations/[id] — Update reservation (staff/admin)
+/**
+ * PATCH /api/reservations/[id]
+ *
+ * Updates reservation details, reruns conflict checks when schedule/table fields
+ * change, syncs Square in the background, and places an immediate saved-card
+ * hold when newly stored Stripe card data belongs to a reservation within 24
+ * hours of booking.
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -139,6 +155,9 @@ export async function PATCH(
             ...(data.partySize && { partySize: data.partySize }),
             ...(data.notes !== undefined && { notes: data.notes }),
             ...(data.status && { status: data.status }),
+            ...(data.stripeSetupIntentId && { stripeSetupIntentId: data.stripeSetupIntentId }),
+            ...(data.stripeCustomerId && { stripeCustomerId: data.stripeCustomerId }),
+            ...(data.stripePaymentMethodId && { stripePaymentMethodId: data.stripePaymentMethodId }),
             startTime: startDateTime,
             endTime: endDateTime,
             reservationDate,
@@ -208,6 +227,9 @@ export async function PATCH(
         ...(data.customerEmail !== undefined && { customerEmail: data.customerEmail }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.status && { status: data.status }),
+        ...(data.stripeSetupIntentId && { stripeSetupIntentId: data.stripeSetupIntentId }),
+        ...(data.stripeCustomerId && { stripeCustomerId: data.stripeCustomerId }),
+        ...(data.stripePaymentMethodId && { stripePaymentMethodId: data.stripePaymentMethodId }),
       };
 
       await prisma.reservation.update({
@@ -256,6 +278,13 @@ export async function PATCH(
       }
     }
 
+    if (data.stripeCustomerId || data.stripePaymentMethodId || data.stripeSetupIntentId) {
+      const holdResult = await placeImmediateHoldIfNeeded(id, 'booking_payment_step');
+      if (holdResult.status === 'failed') {
+        console.error(`[PATCH /api/reservations/[id]] Immediate hold failed for ${id}: ${holdResult.reason}`);
+      }
+    }
+
     // Fetch updated reservation
     const updated = await prisma.reservation.findUnique({
       where: { id },
@@ -286,8 +315,13 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/reservations/[id] — Cancel or hard-delete reservation
-// ?hard=true — permanently delete the record (use with caution)
+/**
+ * DELETE /api/reservations/[id]
+ *
+ * Cancels a reservation by default, or permanently removes it and its related
+ * records when `?hard=true` is passed. Square cancellation is attempted
+ * asynchronously when the reservation has a Square booking.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

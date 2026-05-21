@@ -3,7 +3,7 @@
  * ======================================================
  *
  * Authentication for staff users using credentials (email + password).
- * The "demo123" password is a fallback for development/demo purposes.
+ * The "demo123" password is a fallback for development/demo purposes only.
  * In production, real passwords are hashed with bcryptjs.
  *
  * Key features:
@@ -33,7 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       /**
        * Authorize a staff user by email (stored in `userId`) and password.
-       * Falls back to "demo123" for quick demo access.
+       * Falls back to "demo123" for quick local demo access outside production.
        * @param credentials - The email and password from the login form
        * @returns The user object (with `restaurantId`) or null if invalid
        */
@@ -50,8 +50,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user) return null;
 
-        const valid = await compare(credentials.password as string, user.userId + 'salt');
-        if (!valid && credentials.password !== 'demo123') return null;
+        const password = credentials.password as string;
+        const valid = await compare(password, user.userId + 'salt');
+        const allowDemoPassword = process.env.NODE_ENV !== 'production' && password === 'demo123';
+
+        if (!valid && !allowDemoPassword) return null;
 
         return {
           id: user.userId,

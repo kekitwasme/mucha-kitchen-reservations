@@ -22,6 +22,8 @@ interface Settings {
   } | null;
 }
 
+const initialRenderTime = Date.now();
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [turnTime, setTurnTime] = useState(90);
@@ -48,6 +50,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (data) {
       const rules = data.turnTimeRules as Record<string, number>;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTurnTime(rules?.default ?? 90);
       setMaxParty(data.maxPartySize ?? 12);
       setBlockOutHours(data.blockOutHours ?? 0);
@@ -97,7 +100,7 @@ export default function SettingsPage() {
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading settings...</div>;
 
-  const earliestBookable = new Date(Date.now() + blockOutHours * 60 * 60 * 1000);
+  const earliestBookable = new Date(initialRenderTime + blockOutHours * 60 * 60 * 1000);
 
   return (
     <div className="space-y-6 max-w-2xl">

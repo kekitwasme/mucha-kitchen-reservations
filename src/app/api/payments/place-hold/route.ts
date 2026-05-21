@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createPreAuthHold, createHoldFromSavedCard } from '@/lib/stripe';
+import { createPreAuthHold, createHoldFromSavedCard, releaseHold } from '@/lib/stripe';
+import { requireStaffSession } from '@/lib/api-auth';
 import { z } from 'zod';
 
 const placeHoldSchema = z.object({
@@ -18,15 +19,8 @@ const placeHoldSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
-    // Staff auth check: require auth cookie
-    const hasAuthCookie =
-      request.cookies.has('authjs.session-token') ||
-      request.cookies.has('__Secure-authjs.session-token') ||
-      request.cookies.has('next-auth.session-token');
-
-    if (!hasAuthCookie) {
-      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
-    }
+    const { session, response } = await requireStaffSession();
+    if (response) return response;
 
     const body = await request.json();
     const parsed = placeHoldSchema.safeParse(body);
@@ -47,6 +41,10 @@ export async function POST(request: NextRequest) {
 
     if (!reservation) {
       return NextResponse.json({ error: 'Reservation not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    if (reservation.restaurantId !== session.user.restaurantId) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     if (reservation.stripePaymentIntentId || reservation.paymentHoldStatus) {
@@ -107,47 +105,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await prisma.$transaction([
-      prisma.reservation.update({
-        where: { id: reservationId },
-        data: {
-          stripePaymentIntentId: holdResult.paymentIntentId,
-          paymentHoldStatus: 'requires_capture',
-          holdPlacedAt: new Date(),
-          depositAmount: holdAmount,
-        },
-      }),
-      prisma.payment.create({
-        data: {
-          restaurantId: reservation.restaurantId,
-          reservationId,
-          amount: holdAmount,
-          type: 'deposit',
-          status: 'pending',
-          stripePaymentIntentId: holdResult.paymentIntentId,
-          metadata: {
-            holdStatus: 'requires_capture',
-            holdAmount,
-            partySize: reservation.partySize,
-            perPersonAmount: 500,
-            placedBy: holdSource,
+    try {
+      await prisma.$transaction([
+        prisma.reservation.update({
+          where: { id: reservationId },
+          data: {
+            stripePaymentIntentId: holdResult.paymentIntentId,
+            paymentHoldStatus: 'requires_capture',
+            holdPlacedAt: new Date(),
+            depositAmount: holdAmount,
           },
-        },
-      }),
-      prisma.auditLog.create({
-        data: {
-          restaurantId: reservation.restaurantId,
-          reservationId,
-          action: 'payment_received',
-          details: {
-            type: 'payment_hold_placed_manual',
-            paymentIntentId: holdResult.paymentIntentId,
+        }),
+        prisma.payment.create({
+          data: {
+            restaurantId: reservation.restaurantId,
+            reservationId,
             amount: holdAmount,
-            source: holdSource,
+            type: 'deposit',
+            status: 'pending',
+            stripePaymentIntentId: holdResult.paymentIntentId,
+            metadata: {
+              holdStatus: 'requires_capture',
+              holdAmount,
+              partySize: reservation.partySize,
+              perPersonAmount: 500,
+              placedBy: holdSource,
+            },
           },
-        },
-      }),
-    ]);
+        }),
+        prisma.auditLog.create({
+          data: {
+            restaurantId: reservation.restaurantId,
+            reservationId,
+            action: 'payment_received',
+            details: {
+              type: 'payment_hold_placed_manual',
+              paymentIntentId: holdResult.paymentIntentId,
+              amount: holdAmount,
+              source: holdSource,
+            },
+          },
+        }),
+      ]);
+    } catch (error) {
+      await releaseHold(holdResult.paymentIntentId);
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,

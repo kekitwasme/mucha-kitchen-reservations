@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { releaseHold } from '@/lib/stripe';
+import { requireStaffSession } from '@/lib/api-auth';
 import { z } from 'zod';
 
 const releaseSchema = z.object({
@@ -17,6 +18,9 @@ const releaseSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const { session, response } = await requireStaffSession();
+    if (response) return response;
+
     const body = await request.json();
     const parsed = releaseSchema.safeParse(body);
 
@@ -31,10 +35,15 @@ export async function POST(request: NextRequest) {
 
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
+      include: { payments: true },
     });
 
     if (!reservation) {
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
+    }
+
+    if (reservation.restaurantId !== session.user.restaurantId) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     if (!reservation.stripePaymentIntentId) {
@@ -62,43 +71,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update reservation
-    await prisma.reservation.update({
-      where: { id: reservationId },
-      data: {
-        paymentHoldStatus: 'canceled',
-      },
-    });
+    const existingPayment = reservation.payments.find(
+      (payment) => payment.stripePaymentIntentId === reservation.stripePaymentIntentId
+    );
 
-    // Update payment record
-    await prisma.payment.updateMany({
-      where: {
-        reservationId,
-        stripePaymentIntentId: reservation.stripePaymentIntentId,
-      },
-      data: {
-        status: 'refunded',
-        metadata: {
-          releasedAt: new Date().toISOString(),
-          reason,
+    await prisma.$transaction([
+      prisma.reservation.update({
+        where: { id: reservationId },
+        data: {
+          paymentHoldStatus: 'canceled',
         },
-      },
-    });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        restaurantId: reservation.restaurantId,
-        reservationId,
-        action: 'updated',
-        details: {
-          type: 'payment_hold_released',
-          paymentIntentId: reservation.stripePaymentIntentId,
-          reason,
-          amount: reservation.depositAmount,
+      }),
+      prisma.payment.updateMany({
+        where: {
+          reservationId,
+          stripePaymentIntentId: reservation.stripePaymentIntentId,
         },
-      },
-    });
+        data: {
+          status: 'refunded',
+          metadata: {
+            ...((existingPayment?.metadata as Record<string, unknown> | null) ?? {}),
+            releasedAt: new Date().toISOString(),
+            reason,
+          },
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: reservation.restaurantId,
+          reservationId,
+          action: 'updated',
+          details: {
+            type: 'payment_hold_released',
+            paymentIntentId: reservation.stripePaymentIntentId,
+            reason,
+            amount: reservation.depositAmount,
+          },
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
