@@ -253,29 +253,19 @@ export default function ConfirmPage() {
           </CardContent>
         </Card>
       ) : (
-        /* No hold placed yet */
-        <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/30">
+        /* Card saved — hold will be placed automatically */
+        <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
           <CardContent className="pt-6 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-lg">⏳</span>
-              <p className="font-medium text-amber-900 dark:text-amber-300">Payment Hold Pending</p>
+              <span className="text-lg">💳</span>
+              <p className="font-medium text-green-900 dark:text-green-300">Reservation Secured</p>
             </div>
-            <p className="text-sm text-amber-800/80 dark:text-amber-400">
-              Your reservation is confirmed. A payment hold will be placed 24–48 hours before your reservation time.
+            <p className="text-sm text-green-800/80 dark:text-green-400">
+              Your card has been saved securely. A payment hold will be placed automatically 24–48 hours before your reservation.
             </p>
-            <p className="text-sm text-amber-800/80 dark:text-amber-400">
-              We&apos;ll send you a reminder when it&apos;s time to complete your booking details.
+            <p className="text-sm text-green-800/80 dark:text-green-400">
+              Cancel at least 2 hours before your reservation to avoid any charges.
             </p>
-            {/* Link to complete booking if needed */}
-            <div className="pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href={`/complete-booking/${reservation.id}`} />}
-              >
-                Update Card Details
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
