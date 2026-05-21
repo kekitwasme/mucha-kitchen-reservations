@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createPreAuthHold } from '@/lib/stripe';
+import { createPreAuthHold, createHoldFromSavedCard } from '@/lib/stripe';
 import { ReservationStatus } from '@prisma/client';
 
 /**
@@ -15,6 +15,10 @@ import { ReservationStatus } from '@prisma/client';
  *
  * Idempotent — running twice should not double-place holds because we
  * filter for paymentHoldStatus = null.
+ *
+ * Prefers saved-card holds (SetupIntent pattern). If a reservation has
+ * stripeCustomerId + stripePaymentMethodId, uses createHoldFromSavedCard().
+ * Otherwise skips and logs (legacy reservations without saved card).
  *
  * Returns: { placed: number, failed: number, skipped: number }
  */
@@ -64,14 +68,22 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Must have saved card to place hold with SetupIntent pattern
+        if (!reservation.stripeCustomerId || !reservation.stripePaymentMethodId) {
+          console.warn(
+            `[Cron/PlaceHolds] Skipping reservation ${reservation.id}: missing stripeCustomerId or stripePaymentMethodId`
+          );
+          skipped++;
+          continue;
+        }
+
         // Calculate hold amount: $5 per person in cents
         const holdAmount = reservation.partySize * 500;
 
-        const holdResult = await createPreAuthHold({
+        const holdResult = await createHoldFromSavedCard({
           reservationId: reservation.id,
-          customerEmail: reservation.customerEmail || `${reservation.customerPhone}@placeholder.local`,
-          customerName: reservation.customerName,
-          customerPhone: reservation.customerPhone,
+          customerId: reservation.stripeCustomerId,
+          paymentMethodId: reservation.stripePaymentMethodId,
           amount: holdAmount,
           currency: 'aud',
           restaurantName: reservation.restaurant.name,
@@ -108,6 +120,7 @@ export async function POST(request: NextRequest) {
                 partySize: reservation.partySize,
                 perPersonAmount: 500,
                 placedBy: 'cron',
+                source: 'saved_card',
               },
             },
           }),
@@ -121,6 +134,7 @@ export async function POST(request: NextRequest) {
                 paymentIntentId: holdResult.paymentIntentId,
                 amount: holdAmount,
                 holdHoursBefore,
+                source: 'saved_card',
               },
             },
           }),

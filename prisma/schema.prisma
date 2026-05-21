@@ -207,6 +207,9 @@ model Reservation {
   squareCustomerId     String?
   depositAmount        Int?
   stripePaymentIntentId String?
+  stripeSetupIntentId   String?
+  stripeCustomerId      String?
+  stripePaymentMethodId String?
   paymentHoldStatus     PaymentHoldStatus?
   holdPlacedAt         DateTime?
   holdReminderSent     Boolean           @default(false)

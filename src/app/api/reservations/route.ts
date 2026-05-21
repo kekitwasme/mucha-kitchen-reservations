@@ -174,6 +174,8 @@ export async function POST(request: NextRequest) {
       tableId,
       source,
       status: requestedStatus,
+      stripeSetupIntentId,
+      stripeCustomerId,
     } = parsed.data;
 
     const restaurant = RESTAURANT_ID
@@ -360,6 +362,8 @@ export async function POST(request: NextRequest) {
             paymentHoldRequired: true,
             paymentHoldStatus: null,
             holdPlacedAt: null,
+            stripeSetupIntentId: stripeSetupIntentId || null,
+            stripeCustomerId: stripeCustomerId || null,
             reservationTables: {
               create: candidateTableIds.map((id: string) => ({ tableId: id })),
             },

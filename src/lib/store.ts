@@ -27,6 +27,10 @@ interface BookingState {
   paymentIntentId: string | null;
   clientSecret: string | null;
   holdAmount: number;
+  // SetupIntent state (card saved at booking time)
+  setupIntentId: string | null;
+  setupClientSecret: string | null;
+  stripeCustomerId: string | null;
   // Reservation ID after creation
   reservationId: string | null;
   setSelectedTableId: (id: string | null) => void;
@@ -37,6 +41,7 @@ interface BookingState {
   setPartySize: (size: number) => void;
   setSelectedTime: (time: string | null) => void;
   setPaymentData: (data: { paymentIntentId: string; clientSecret: string; holdAmount: number }) => void;
+  setSetupData: (data: { setupIntentId: string; setupClientSecret: string; stripeCustomerId: string }) => void;
   setReservationId: (id: string | null) => void;
   reset: () => void;
 }
@@ -53,6 +58,10 @@ const initialBookingState = {
   paymentIntentId: null,
   clientSecret: null,
   holdAmount: 0,
+  // SetupIntent fields
+  setupIntentId: null,
+  setupClientSecret: null,
+  stripeCustomerId: null,
   reservationId: null,
 };
 
@@ -67,6 +76,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId, selectedTableId: null }),
   setSeatingChoice: (seatingChoice) => set({ seatingChoice }),
   setPaymentData: (data) => set({ paymentIntentId: data.paymentIntentId, clientSecret: data.clientSecret, holdAmount: data.holdAmount }),
+  setSetupData: (data) => set({ setupIntentId: data.setupIntentId, setupClientSecret: data.setupClientSecret, stripeCustomerId: data.stripeCustomerId }),
   setReservationId: (reservationId) => set({ reservationId }),
   reset: () => set(initialBookingState),
 }));

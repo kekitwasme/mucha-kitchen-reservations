@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createPreAuthHold } from '@/lib/stripe';
+import { createPreAuthHold, createHoldFromSavedCard } from '@/lib/stripe';
 import { z } from 'zod';
 
 const placeHoldSchema = z.object({
@@ -11,6 +11,10 @@ const placeHoldSchema = z.object({
  * POST /api/payments/place-hold
  * Staff-only endpoint to manually trigger a payment hold on a specific reservation.
  * Verifies staff auth via auth cookie/session.
+ *
+ * Prefers saved-card holds (SetupIntent pattern). If a reservation has
+ * stripeCustomerId + stripePaymentMethodId, uses createHoldFromSavedCard().
+ * Otherwise falls back to createPreAuthHold() (legacy flow).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -62,15 +66,39 @@ export async function POST(request: NextRequest) {
     // Calculate hold amount: $5 per person in cents
     const holdAmount = reservation.partySize * 500;
 
-    const holdResult = await createPreAuthHold({
-      reservationId: reservation.id,
-      customerEmail: reservation.customerEmail || `${reservation.customerPhone}@placeholder.local`,
-      customerName: reservation.customerName,
-      customerPhone: reservation.customerPhone,
-      amount: holdAmount,
-      currency: 'aud',
-      restaurantName: reservation.restaurant.name,
-    });
+    let holdResult: {
+      paymentIntentId: string;
+      clientSecret: string;
+      status: string;
+    } | null = null;
+    let holdSource = 'staff_manual';
+
+    // Prefer saved card (SetupIntent pattern)
+    if (reservation.stripeCustomerId && reservation.stripePaymentMethodId) {
+      holdResult = await createHoldFromSavedCard({
+        reservationId: reservation.id,
+        customerId: reservation.stripeCustomerId,
+        paymentMethodId: reservation.stripePaymentMethodId,
+        amount: holdAmount,
+        currency: 'aud',
+        restaurantName: reservation.restaurant.name,
+      });
+      holdSource = 'staff_manual_saved_card';
+    }
+
+    // Fallback to legacy pre-auth hold
+    if (!holdResult) {
+      holdResult = await createPreAuthHold({
+        reservationId: reservation.id,
+        customerEmail: reservation.customerEmail || `${reservation.customerPhone}@placeholder.local`,
+        customerName: reservation.customerName,
+        customerPhone: reservation.customerPhone,
+        amount: holdAmount,
+        currency: 'aud',
+        restaurantName: reservation.restaurant.name,
+      });
+      holdSource = 'staff_manual';
+    }
 
     if (!holdResult) {
       return NextResponse.json(
@@ -102,7 +130,7 @@ export async function POST(request: NextRequest) {
             holdAmount,
             partySize: reservation.partySize,
             perPersonAmount: 500,
-            placedBy: 'staff_manual',
+            placedBy: holdSource,
           },
         },
       }),
@@ -115,6 +143,7 @@ export async function POST(request: NextRequest) {
             type: 'payment_hold_placed_manual',
             paymentIntentId: holdResult.paymentIntentId,
             amount: holdAmount,
+            source: holdSource,
           },
         },
       }),

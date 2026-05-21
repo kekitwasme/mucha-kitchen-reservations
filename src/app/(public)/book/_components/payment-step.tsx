@@ -10,34 +10,33 @@ import {
 } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useBookingStore } from '@/lib/store';
 
 // Initialize Stripe — publishable key comes from env
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 );
 
-interface CompleteBookingStepProps {
+interface PaymentStepProps {
   reservationId: string;
+  setupIntentId: string;
   clientSecret: string;
-  holdAmount: number;
-  partySize: number;
+  stripeCustomerId: string;
   onSuccess: () => void;
   onCancel?: () => void;
 }
 
 /**
- * Stripe PaymentElement form for confirming a pre-auth hold.
+ * Stripe PaymentElement form for saving card details via SetupIntent.
  * Wraps PaymentElement in Elements provider.
  */
-export default function CompleteBookingStep({
+export default function PaymentStep({
   reservationId,
+  setupIntentId,
   clientSecret,
-  holdAmount,
-  partySize,
+  stripeCustomerId,
   onSuccess,
   onCancel,
-}: CompleteBookingStepProps) {
+}: PaymentStepProps) {
   return (
     <Elements
       stripe={stripePromise}
@@ -58,8 +57,9 @@ export default function CompleteBookingStep({
       }}
     >
       <PaymentForm
-        holdAmount={holdAmount}
-        partySize={partySize}
+        reservationId={reservationId}
+        setupIntentId={setupIntentId}
+        stripeCustomerId={stripeCustomerId}
         onSuccess={onSuccess}
         onCancel={onCancel}
       />
@@ -68,13 +68,15 @@ export default function CompleteBookingStep({
 }
 
 function PaymentForm({
-  holdAmount,
-  partySize,
+  reservationId,
+  setupIntentId,
+  stripeCustomerId,
   onSuccess,
   onCancel,
 }: {
-  holdAmount: number;
-  partySize: number;
+  reservationId: string;
+  setupIntentId: string;
+  stripeCustomerId: string;
   onSuccess: () => void;
   onCancel?: () => void;
 }) {
@@ -100,52 +102,63 @@ function PaymentForm({
       return;
     }
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const { error: confirmError, setupIntent } = await stripe.confirmSetup({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/confirm`,
+        return_url: `${window.location.origin}/confirm/${reservationId}`,
       },
       redirect: 'if_required',
     });
 
     if (confirmError) {
-      setError(confirmError.message || 'Payment confirmation failed');
+      setError(confirmError.message || 'Card setup failed');
       setIsLoading(false);
       return;
     }
 
-    // Payment confirmed (hold placed)
+    // Use the setupIntent ID from the response if available, otherwise fall back to the prop
+    const confirmedSetupIntentId = setupIntent?.id || setupIntentId;
+
+    // SetupIntent confirmed — update reservation with SetupIntent ID and Customer ID
+    try {
+      const res = await fetch(`/api/reservations/${reservationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stripeSetupIntentId: confirmedSetupIntentId,
+          stripeCustomerId,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to update reservation');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to finalize booking');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(false);
     onSuccess();
   };
 
-  const formattedAmount = `$${(holdAmount / 100).toFixed(2)}`;
-  const perPerson = `$${(holdAmount / partySize / 100).toFixed(2)}`;
-
   return (
     <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CardHeader>
-        <CardTitle className="text-center">Complete Your Booking</CardTitle>
+        <CardTitle className="text-center">Secure Your Reservation</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Hold info */}
+        {/* Info */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
           <p className="text-sm text-muted-foreground">
-            To secure your reservation, please provide your card details.
-            A <strong>{formattedAmount}</strong> hold will be placed on your card.
+            We require a card to secure your reservation.
+            <strong> You won&apos;t be charged unless you don&apos;t show up.</strong>
           </p>
           <div className="border-t pt-2 mt-2 space-y-1">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Hold amount</span>
-              <span className="text-lg font-semibold">{formattedAmount}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Per person</span>
-              <span className="text-sm">{perPerson}</span>
-            </div>
-            <p className="text-sm text-muted-foreground pt-1">
-              Your card will be held, not charged. You will only be charged if you
-              don&apos;t show up for your reservation.
+            <p className="text-sm text-muted-foreground">
+              Your card details will be saved securely. A hold may be placed 24–48 hours before your reservation.
             </p>
             <p className="text-sm text-muted-foreground">
               Cancel at least 2 hours before your reservation to avoid any charges.
@@ -182,7 +195,7 @@ function PaymentForm({
               disabled={!stripe || isLoading}
               className="w-full sm:w-auto sm:flex-1 h-12"
             >
-              {isLoading ? 'Placing hold...' : `Confirm Hold (${formattedAmount})`}
+              {isLoading ? 'Saving card...' : 'Save Card & Confirm'}
             </Button>
           </div>
         </form>

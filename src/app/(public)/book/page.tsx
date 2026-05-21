@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useBookingStore, type BookingStep } from '@/lib/store';
-
-
+import PaymentStep from './_components/payment-step';
 
 export default function BookPage() {
   const store = useBookingStore();
@@ -24,7 +23,7 @@ export default function BookPage() {
   const [highChairs, setHighChairs] = useState(0);
   const [guestType, setGuestType] = useState<'new' | 'returning' | 'regular'>('new');
 
-  const steps: BookingStep[] = ['date', 'party', 'time', 'details', 'confirmation'];
+  const steps: BookingStep[] = ['date', 'party', 'time', 'details', 'payment', 'confirmation'];
   const currentStepIndex = steps.indexOf(store.step);
 
   const goBack = () => {
@@ -59,7 +58,30 @@ export default function BookPage() {
       const reservation = data.reservation;
       store.setReservationId(reservation.id);
 
-      router.push(`/confirm/${reservation.id}`);
+      // Create SetupIntent to save card details
+      const setupRes = await fetch('/api/payments/setup-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerEmail: email || `${phone}@placeholder.local`,
+          customerName: name,
+          customerPhone: phone,
+        }),
+      });
+
+      if (!setupRes.ok) {
+        const body = await setupRes.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to create SetupIntent');
+      }
+
+      const setupData = await setupRes.json();
+      store.setSetupData({
+        setupIntentId: setupData.setupIntentId,
+        setupClientSecret: setupData.clientSecret,
+        stripeCustomerId: setupData.customerId,
+      });
+
+      store.setStep('payment');
     },
   });
 
@@ -101,32 +123,34 @@ export default function BookPage() {
 
       {/* Navigation buttons */}
       <div className={`flex flex-col sm:flex-row gap-3 ${canGoBack ? 'justify-between' : ''}`}>
-        {canGoBack && (
+        {canGoBack && store.step !== 'confirmation' && (
           <Button variant="outline" onClick={goBack} className="w-full sm:w-auto sm:flex-1 h-12">
             Back
           </Button>
         )}
-        <Button
-          variant="default"
-          onClick={store.step === 'details' ? handleSubmit : () => {
-            if (currentStepIndex < steps.length - 1) {
-              store.setStep(steps[currentStepIndex + 1]);
+        {store.step !== 'payment' && store.step !== 'confirmation' && (
+          <Button
+            variant="default"
+            onClick={store.step === 'details' ? handleSubmit : () => {
+              if (currentStepIndex < steps.length - 1) {
+                store.setStep(steps[currentStepIndex + 1]);
+              }
+            }}
+            disabled={
+              (store.step === 'date' && !store.date) ||
+              (store.step === 'party' && !store.partySize) ||
+              (store.step === 'time' && !store.selectedTime) ||
+              (store.step === 'details' && (!name || !phone || createReservation.isPending))
             }
-          }}
-          disabled={
-            (store.step === 'date' && !store.date) ||
-            (store.step === 'party' && !store.partySize) ||
-            (store.step === 'time' && !store.selectedTime) ||
-            (store.step === 'details' && (!name || !phone || createReservation.isPending))
-          }
-          className="w-full sm:w-auto sm:flex-1 h-12"
-        >
-          {store.step === 'details'
-            ? createReservation.isPending
-              ? 'Creating reservation...'
-              : 'Confirm Booking'
-            : 'Continue'}
-        </Button>
+            className="w-full sm:w-auto sm:flex-1 h-12"
+          >
+            {store.step === 'details'
+              ? createReservation.isPending
+                ? 'Creating reservation...'
+                : 'Continue'
+              : 'Continue'}
+          </Button>
+        )}
       </div>
 
       {/* Step 1: Date */}
@@ -375,16 +399,28 @@ export default function BookPage() {
         </Card>
       )}
 
-      {/* Step 5: Confirmation */}
+      {/* Step 5: Payment */}
+      {store.step === 'payment' && store.reservationId && store.setupClientSecret && (
+        <PaymentStep
+          reservationId={store.reservationId}
+          setupIntentId={store.setupIntentId || ''}
+          clientSecret={store.setupClientSecret}
+          stripeCustomerId={store.stripeCustomerId || ''}
+          onSuccess={() => store.setStep('confirmation')}
+          onCancel={() => store.setStep('details')}
+        />
+      )}
+
+      {/* Step 6: Confirmation */}
       {store.step === 'confirmation' && store.reservationId && (
         <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 text-center py-8">
           <CardContent className="space-y-4">
             <div className="text-6xl">✅</div>
             <h2 className="text-2xl font-bold">Booking Confirmed!</h2>
             <p className="text-muted-foreground">
-              Your reservation is confirmed.
+              Your reservation is confirmed and secured with your card on file.
               <br />
-              A payment hold will be placed 24–48 hours before your reservation time.
+              A hold will be placed 24–48 hours before your reservation time.
             </p>
             <Button
               onClick={() => {

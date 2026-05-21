@@ -101,6 +101,8 @@ export const createReservationSchema = z.object({
   tableId: z.string().optional(),
   source: ReservationSourceEnum.optional().default('online'),
   status: ReservationStatusEnum.optional(), // walk-ins may pass 'seated' or 'pending'
+  stripeSetupIntentId: z.string().optional(),
+  stripeCustomerId: z.string().optional(),
 });
 
 /** Query parameters for GET /api/reservations — list with filters. */
@@ -132,6 +134,8 @@ export const updateReservationSchema = z.object({
   guestType: z.enum(['new', 'returning', 'regular']).optional(),
   tableIds: z.array(z.string()).optional(),
   source: ReservationSourceEnum.optional(),
+  stripeSetupIntentId: z.string().optional(),
+  stripeCustomerId: z.string().optional(),
 });
 
 // ─── Availability ────────────────────────────────────────────────

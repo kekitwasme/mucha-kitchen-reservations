@@ -36,8 +36,127 @@ interface HoldData {
 }
 
 /**
+ * Create a SetupIntent to save card details without charging.
+ * Returns client_secret for frontend to confirm.
+ */
+export async function createSetupIntent(data: {
+  customerEmail: string;
+  customerName: string;
+  customerPhone?: string;
+}): Promise<{
+  setupIntentId: string;
+  clientSecret: string;
+  customerId: string;
+} | null> {
+  try {
+    const stripe = getStripe();
+
+    // 1. Search for existing customer by email, or create new
+    let customerId: string | null = null;
+    const searchResult = await stripe.customers.search({
+      query: `email:"${data.customerEmail}"`,
+      limit: 1,
+    });
+
+    if (searchResult.data.length > 0) {
+      customerId = searchResult.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: data.customerEmail,
+        name: data.customerName,
+        ...(data.customerPhone ? { phone: data.customerPhone } : {}),
+      });
+      customerId = customer.id;
+    }
+
+    if (!customerId) {
+      console.error('[Stripe] createSetupIntent: failed to create or find customer');
+      return null;
+    }
+
+    // 2. Create SetupIntent with that customer
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      usage: 'off_session',
+      metadata: {
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+      },
+    });
+
+    if (!setupIntent.id || !setupIntent.client_secret) {
+      console.error('[Stripe] SetupIntent created but missing id or client_secret');
+      return null;
+    }
+
+    return {
+      setupIntentId: setupIntent.id,
+      clientSecret: setupIntent.client_secret,
+      customerId,
+    };
+  } catch (error) {
+    console.error('[Stripe] createSetupIntent failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Create a PaymentIntent using a saved PaymentMethod.
+ * Called by cron to place the actual hold.
+ */
+export async function createHoldFromSavedCard(data: {
+  reservationId: string;
+  customerId: string;
+  paymentMethodId: string;
+  amount: number;
+  currency?: string;
+  restaurantName?: string;
+}): Promise<{
+  paymentIntentId: string;
+  clientSecret: string;
+  status: string;
+} | null> {
+  try {
+    const stripe = getStripe();
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: data.amount,
+      currency: data.currency || 'aud',
+      capture_method: 'manual',
+      customer: data.customerId,
+      payment_method: data.paymentMethodId,
+      confirm: true,
+      off_session: true,
+      payment_method_types: ['card'],
+      metadata: {
+        reservationId: data.reservationId,
+        restaurantName: data.restaurantName || 'Restaurant',
+      },
+      description: `Booking hold — $${(data.amount / 100).toFixed(2)}`,
+    });
+
+    if (!paymentIntent.id || !paymentIntent.client_secret) {
+      console.error('[Stripe] PaymentIntent created but missing id or client_secret');
+      return null;
+    }
+
+    return {
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
+      status: paymentIntent.status,
+    };
+  } catch (error) {
+    console.error('[Stripe] createHoldFromSavedCard failed:', error);
+    return null;
+  }
+}
+
+/**
  * Create a PaymentIntent with capture_method: 'manual' (pre-auth hold).
  * Returns the PaymentIntent ID and client_secret for the frontend.
+ *
+ * Kept for staff manual hold endpoint as fallback.
  */
 export async function createPreAuthHold(data: HoldData): Promise<{
   paymentIntentId: string;
