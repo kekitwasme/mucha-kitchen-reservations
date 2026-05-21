@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useBookingStore, type BookingStep } from '@/lib/store';
+import PaymentStep from './_components/payment-step';
 
 
 export default function BookPage() {
@@ -23,7 +24,7 @@ export default function BookPage() {
   const [highChairs, setHighChairs] = useState(0);
   const [guestType, setGuestType] = useState<'new' | 'returning' | 'regular'>('new');
 
-  const steps: BookingStep[] = ['date', 'party', 'time', 'details'];
+  const steps: BookingStep[] = ['date', 'party', 'time', 'details', 'payment', 'confirmation'];
   const currentStepIndex = steps.indexOf(store.step);
 
   const goBack = () => {
@@ -54,8 +55,37 @@ export default function BookPage() {
       if (!res.ok) throw new Error('Failed to create reservation');
       return res.json();
     },
-    onSuccess: (data) => {
-      router.push(`/confirm/${data.reservation.id}`);
+    onSuccess: async (data) => {
+      const reservation = data.reservation;
+      store.setReservationId(reservation.id);
+
+      // Create payment hold
+      const holdRes = await fetch('/api/payments/hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId: reservation.id,
+          customerEmail: email || reservation.customerEmail,
+          customerName: name || reservation.customerName,
+          customerPhone: phone || reservation.customerPhone,
+          partySize: store.partySize,
+        }),
+      });
+
+      if (!holdRes.ok) {
+        // Hold failed — still show confirmation but warn
+        console.error('Payment hold failed:', await holdRes.text());
+        router.push(`/confirm/${reservation.id}`);
+        return;
+      }
+
+      const holdData = await holdRes.json();
+      store.setPaymentData({
+        paymentIntentId: holdData.paymentIntentId,
+        clientSecret: holdData.clientSecret,
+        holdAmount: holdData.holdAmount,
+      });
+      store.setStep('payment');
     },
   });
 
@@ -119,8 +149,8 @@ export default function BookPage() {
         >
           {store.step === 'details'
             ? createReservation.isPending
-              ? 'Confirming...'
-              : 'Confirm Booking'
+              ? 'Creating reservation...'
+              : 'Continue to Payment'
             : 'Continue'}
         </Button>
       </div>
@@ -367,6 +397,44 @@ export default function BookPage() {
             {createReservation.isError && (
               <p className="text-red-500 text-sm">Failed to create reservation. Please try again.</p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 5: Payment */}
+      {store.step === 'payment' && store.clientSecret && (
+        <PaymentStep
+          clientSecret={store.clientSecret}
+          holdAmount={store.holdAmount}
+          partySize={store.partySize}
+          onSuccess={() => {
+            store.setStep('confirmation');
+          }}
+          onCancel={() => {
+            store.setStep('details');
+          }}
+        />
+      )}
+
+      {/* Step 6: Confirmation */}
+      {store.step === 'confirmation' && store.reservationId && (
+        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 text-center py-8">
+          <CardContent className="space-y-4">
+            <div className="text-6xl">✅</div>
+            <h2 className="text-2xl font-bold">Booking Confirmed!</h2>
+            <p className="text-muted-foreground">
+              A hold of <strong>${(store.holdAmount / 100).toFixed(2)}</strong> has been placed on your card.
+              <br />
+              You will only be charged if you don&apos;t show up.
+            </p>
+            <Button
+              onClick={() => {
+                router.push(`/confirm/${store.reservationId}`);
+              }}
+              className="h-12"
+            >
+              View Booking Details
+            </Button>
           </CardContent>
         </Card>
       )}

@@ -33,6 +33,10 @@ interface ReservationData {
   auditLogs?: AuditLogEntry[];
   createdAt: string;
   updatedAt: string;
+  // Payment hold fields
+  depositAmount?: number;
+  paymentHoldStatus?: string;
+  stripePaymentIntentId?: string;
 }
 
 const STATUS_CONFIG: Record<
@@ -221,6 +225,34 @@ export default function ConfirmPage() {
           <p className="text-sm text-muted-foreground">(08) 9221 1234</p>
         </CardContent>
       </Card>
+
+      {/* Payment Hold Info */}
+      {reservation.depositAmount && reservation.depositAmount > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
+          <CardContent className="pt-6 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💳</span>
+              <p className="font-medium text-blue-900 dark:text-blue-300">Payment Hold Active</p>
+            </div>
+            <p className="text-sm text-blue-800/80 dark:text-blue-400">
+              A hold of <strong>${(reservation.depositAmount / 100).toFixed(2)}</strong> has been placed on your card.
+            </p>
+            <p className="text-sm text-blue-800/80 dark:text-blue-400">
+              This is only charged if you don&apos;t show up. Cancel at least 2 hours before your reservation to avoid charges.
+            </p>
+            {reservation.paymentHoldStatus === 'captured' && (
+              <p className="text-sm text-red-600 font-medium">
+                ⚠️ This hold has been captured as a no-show fee.
+              </p>
+            )}
+            {reservation.paymentHoldStatus === 'canceled' && (
+              <p className="text-sm text-green-600 font-medium">
+                ✅ This hold has been released. No charges apply.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Terminal status notice */}
       {isTerminal && (

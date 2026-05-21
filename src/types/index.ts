@@ -10,9 +10,9 @@
  *
  * @module types
  */
-import { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction } from '@prisma/client';
+import { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, PaymentHoldStatus, AuditAction } from '@prisma/client';
 
-export { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, AuditAction };
+export { ReservationStatus, TableShape, TableArea, PaymentStatus, PaymentType, PaymentHoldStatus, AuditAction };
 
 export interface Restaurant {
   id: string;
@@ -77,6 +77,8 @@ export interface Reservation {
   squareBookingId?: string;
   squareCustomerId?: string;
   depositAmount?: number;
+  stripePaymentIntentId?: string;
+  paymentHoldStatus?: PaymentHoldStatus;
   createdAt: Date;
   updatedAt: Date;
   tables?: Table[];
@@ -110,6 +112,7 @@ export interface Payment {
   type: PaymentType;
   status: PaymentStatus;
   squarePaymentId?: string;
+  stripePaymentIntentId?: string;
   metadata?: unknown;
   createdAt: Date;
   updatedAt: Date;

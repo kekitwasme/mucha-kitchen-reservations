@@ -13,7 +13,7 @@ import { create } from 'zustand';
 // ─── Booking Flow ───────────────────────────────────────────────
 
 /** Steps in the customer booking wizard. */
-export type BookingStep = 'date' | 'party' | 'time' | 'details';
+export type BookingStep = 'date' | 'party' | 'time' | 'details' | 'payment' | 'confirmation';
 
 interface BookingState {
   step: BookingStep;
@@ -23,6 +23,12 @@ interface BookingState {
   selectedTableId: string | null;
   selectedGroupId: string | null;
   seatingChoice: 'auto' | 'manual' | null;
+  // Payment state
+  paymentIntentId: string | null;
+  clientSecret: string | null;
+  holdAmount: number;
+  // Reservation ID after creation
+  reservationId: string | null;
   setSelectedTableId: (id: string | null) => void;
   setSelectedGroupId: (id: string | null) => void;
   setSeatingChoice: (choice: 'auto' | 'manual' | null) => void;
@@ -30,6 +36,8 @@ interface BookingState {
   setDate: (date: Date | undefined) => void;
   setPartySize: (size: number) => void;
   setSelectedTime: (time: string | null) => void;
+  setPaymentData: (data: { paymentIntentId: string; clientSecret: string; holdAmount: number }) => void;
+  setReservationId: (id: string | null) => void;
   reset: () => void;
 }
 
@@ -41,6 +49,10 @@ const initialBookingState = {
   selectedTableId: null,
   selectedGroupId: null,
   seatingChoice: null,
+  paymentIntentId: null,
+  clientSecret: null,
+  holdAmount: 0,
+  reservationId: null,
 };
 
 /** Manages the customer booking wizard state (step, date, party size, time slot, table selection). */
@@ -53,6 +65,8 @@ export const useBookingStore = create<BookingState>((set) => ({
   setSelectedTableId: (selectedTableId) => set({ selectedTableId, selectedGroupId: null }),
   setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId, selectedTableId: null }),
   setSeatingChoice: (seatingChoice) => set({ seatingChoice }),
+  setPaymentData: (data) => set({ paymentIntentId: data.paymentIntentId, clientSecret: data.clientSecret, holdAmount: data.holdAmount }),
+  setReservationId: (reservationId) => set({ reservationId }),
   reset: () => set(initialBookingState),
 }));
 

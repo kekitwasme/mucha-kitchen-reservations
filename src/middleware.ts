@@ -26,7 +26,8 @@ export default function middleware(req: NextRequest) {
   const isPublicReservationAction =
     (nextUrl.pathname === '/api/reservations' && req.method === 'POST') ||
     (/^\/api\/reservations\/[^/]+\/cancel$/.test(nextUrl.pathname) && req.method === 'POST') ||
-    (/^\/api\/reservations\/[^/]+\/reschedule$/.test(nextUrl.pathname) && req.method === 'POST');
+    (/^\/api\/reservations\/[^/]+\/reschedule$/.test(nextUrl.pathname) && req.method === 'POST') ||
+    (nextUrl.pathname === '/api/payments/hold' && req.method === 'POST');
 
   if (isPublicRoute || isPublicReservationAction) {
     return NextResponse.next();

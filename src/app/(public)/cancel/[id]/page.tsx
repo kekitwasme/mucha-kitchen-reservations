@@ -34,6 +34,9 @@ interface ReservationData {
   auditLogs?: AuditLogEntry[];
   createdAt: string;
   updatedAt: string;
+  // Payment hold fields
+  depositAmount?: number;
+  paymentHoldStatus?: string;
 }
 
 const STATUS_CONFIG: Record<
@@ -275,6 +278,8 @@ export default function CancelPage() {
 
   // Cancellation success state
   if (cancelMutation.isSuccess) {
+    const holdReleased = (cancelMutation.data as { holdReleased?: boolean })?.holdReleased;
+
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6">
         <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
@@ -287,6 +292,25 @@ export default function CancelPage() {
             <p className="text-muted-foreground">
               The reservation for {reservation.customerName} on {reservationDateFormatted} has been cancelled.
             </p>
+            {reservation.depositAmount && reservation.depositAmount > 0 && (
+              <div className="bg-white/60 rounded-lg p-3 space-y-1">
+                {holdReleased ? (
+                  <>
+                    <p className="text-sm text-green-600 font-medium">✅ Payment hold released</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your card hold of ${(reservation.depositAmount / 100).toFixed(2)} has been released. No charges apply.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-amber-600 font-medium">⚠️ Cancellation within 2 hours</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your reservation was cancelled less than 2 hours before the scheduled time. The payment hold of ${(reservation.depositAmount / 100).toFixed(2)} may still be captured as a no-show fee. Please contact the restaurant for assistance.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
             <Button className="w-full" render={<Link href="/book" />}>
               <CalendarPlus className="mr-2 h-4 w-4" />
               Add to Calendar

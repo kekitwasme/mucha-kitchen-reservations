@@ -83,6 +83,10 @@ interface ReservationDetail {
     action: string;
     createdAt: string;
   }[];
+  // Payment hold fields
+  depositAmount?: number;
+  paymentHoldStatus?: string;
+  stripePaymentIntentId?: string;
 }
 
 interface TableInfo {
@@ -107,6 +111,8 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
   const [tableError, setTableError] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   // Fetch reservation detail
   const {
@@ -149,6 +155,51 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to update status');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservation', reservationId] });
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    },
+  });
+
+  // Payment capture mutation (manual capture for no-shows)
+  const captureMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/payments/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId: id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to capture payment');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setCaptureDialogOpen(false);
+      setCaptureError(null);
+      queryClient.invalidateQueries({ queryKey: ['reservation', reservationId] });
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    },
+    onError: (error: Error) => {
+      setCaptureError(error.message);
+    },
+  });
+
+  // Payment release mutation (for staff cancellation or seated)
+  const releaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/payments/release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId: id, reason: 'staff_cancel' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to release payment');
       }
       return res.json();
     },
@@ -400,6 +451,64 @@ export default function ReservationDetailDrawer({ reservationId, onClose }: Prop
                     : <span className="text-muted-foreground">Unassigned</span>}
                 </div>
               </div>
+
+              {/* Payment Hold Info */}
+              {detail.depositAmount && detail.depositAmount > 0 && (
+                <div className="col-span-2 bg-blue-50/50 dark:bg-blue-950/30 rounded-lg p-3 space-y-2 border border-blue-200 dark:border-blue-900">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Payment Hold</span>
+                    <Badge variant="outline" className={
+                      detail.paymentHoldStatus === 'requires_capture' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      detail.paymentHoldStatus === 'captured' ? 'bg-green-50 text-green-700 border-green-200' :
+                      detail.paymentHoldStatus === 'canceled' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+                      'bg-gray-50 text-gray-600 border-gray-200'
+                    }>
+                      {detail.paymentHoldStatus?.replace('_', ' ') || 'unknown'}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Hold amount</span>
+                    <span className="font-medium">${(detail.depositAmount / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Per person</span>
+                    <span className="font-medium">${(detail.depositAmount / detail.partySize / 100).toFixed(2)}</span>
+                  </div>
+                  {/* Action buttons for payment hold */}
+                  {detail.paymentHoldStatus === 'requires_capture' && (
+                    <div className="flex gap-2 pt-1">
+                      {detail.status === 'no_show' && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setCaptureDialogOpen(true)}
+                          disabled={captureMutation.isPending}
+                          className="flex-1"
+                        >
+                          {captureMutation.isPending ? 'Capturing...' : `Capture $${(detail.depositAmount / 100).toFixed(2)}`}
+                        </Button>
+                      )}
+                      {detail.status !== 'no_show' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => releaseMutation.mutate(detail.id)}
+                          disabled={releaseMutation.isPending}
+                          className="flex-1"
+                        >
+                          {releaseMutation.isPending ? 'Releasing...' : 'Release Hold'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {detail.paymentHoldStatus === 'captured' && (
+                    <p className="text-sm text-green-600 font-medium">✅ Hold captured as no-show fee</p>
+                  )}
+                  {detail.paymentHoldStatus === 'canceled' && (
+                    <p className="text-sm text-gray-500">Hold released — no charges</p>
+                  )}
+                </div>
+              )}
 
               {/* Notes — full width */}
               {detail.notes && (

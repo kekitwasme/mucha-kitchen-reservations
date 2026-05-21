@@ -49,6 +49,13 @@ enum PaymentStatus {
   refunded
 }
 
+enum PaymentHoldStatus {
+  requires_capture
+  captured
+  canceled
+  failed
+}
+
 enum PaymentType {
   deposit
   per_person_deposit
@@ -195,11 +202,13 @@ model Reservation {
   highChairs       Int                @default(0)
   isReturningGuest Boolean            @default(false)
   guestType        GuestType?         @default(new)
-  squareBookingId  String?
-  squareCustomerId String?
-  depositAmount    Int?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  squareBookingId      String?
+  squareCustomerId     String?
+  depositAmount        Int?
+  stripePaymentIntentId String?
+  paymentHoldStatus     PaymentHoldStatus?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   reservationTables ReservationTable[]
@@ -254,8 +263,9 @@ model Payment {
   amount          Int
   type            PaymentType
   status          PaymentStatus @default(pending)
-  squarePaymentId String?
-  metadata        Json?
+  squarePaymentId       String?
+  stripePaymentIntentId String?
+  metadata              Json?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
