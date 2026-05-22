@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -77,12 +77,18 @@ export default function BookPage() {
   const currentStepIndex = steps.indexOf(store.step);
   const currentStepMeta = STEP_META[store.step];
 
-  useEffect(() => {
+  const focusActiveStep = useCallback(() => {
     window.requestAnimationFrame(() => {
-      activeStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      activeStepRef.current?.focus({ preventScroll: true });
+      window.requestAnimationFrame(() => {
+        activeStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        activeStepRef.current?.focus({ preventScroll: true });
+      });
     });
-  }, [store.step]);
+  }, []);
+
+  useEffect(() => {
+    focusActiveStep();
+  }, [focusActiveStep, store.step]);
 
   /**
    * Moves the booking wizard back one step when a previous step exists.
@@ -95,7 +101,11 @@ export default function BookPage() {
 
   const canGoBack = currentStepIndex > 0;
 
-  const { data: availability } = useQuery({
+  const {
+    data: availability,
+    dataUpdatedAt: availabilityUpdatedAt,
+    isFetching: availabilityIsFetching,
+  } = useQuery({
     queryKey: ['availability', format(store.date || new Date(), 'yyyy-MM-dd'), store.partySize],
     queryFn: async () => {
       if (!store.partySize) throw new Error('Party size is required');
@@ -105,6 +115,12 @@ export default function BookPage() {
     },
     enabled: !!store.date && !!store.partySize && store.step === 'time',
   });
+
+  useEffect(() => {
+    if (store.step === 'time' && !availabilityIsFetching && availabilityUpdatedAt > 0) {
+      focusActiveStep();
+    }
+  }, [availabilityIsFetching, availabilityUpdatedAt, focusActiveStep, store.step]);
 
   const groupedTimeSlots = useMemo(() => {
     const slots = (availability?.slots ?? []) as AvailabilitySlot[];
@@ -359,7 +375,7 @@ export default function BookPage() {
                     ] as const).map(([label, slots]) => (
                       slots.length > 0 && (
                         <section key={label} className="space-y-2">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 py-2">
                             <div className="h-px flex-1 bg-border" />
                             <h3 className="min-w-20 text-center text-sm font-semibold">{label}</h3>
                             <div className="h-px flex-1 bg-border" />
