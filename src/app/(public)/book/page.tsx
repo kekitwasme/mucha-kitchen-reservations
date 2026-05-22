@@ -72,18 +72,12 @@ export default function BookPage() {
   const [dietary, setDietary] = useState('');
   const [highChairs, setHighChairs] = useState(0);
   const activeStepRef = useRef<HTMLDivElement>(null);
-  const hasMountedRef = useRef(false);
 
   const steps: BookingStep[] = ['date', 'party', 'time', 'details', 'payment', 'confirmation'];
   const currentStepIndex = steps.indexOf(store.step);
   const currentStepMeta = STEP_META[store.step];
 
   useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      return;
-    }
-
     window.requestAnimationFrame(() => {
       activeStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       activeStepRef.current?.focus({ preventScroll: true });
@@ -195,6 +189,14 @@ export default function BookPage() {
     createReservation.mutate(payload);
   };
 
+  /**
+   * Commits the chosen time and advances straight to the guest details form.
+   */
+  const selectTime = (time: string) => {
+    store.setSelectedTime(time);
+    store.setStep('details');
+  };
+
   return (
     <div className="mx-auto max-w-xl px-4 py-6 sm:px-6 sm:py-8 space-y-5">
       <section className="space-y-3 text-center">
@@ -243,9 +245,9 @@ export default function BookPage() {
       )}
 
       {/* Navigation buttons */}
-      <div className={`flex flex-col sm:flex-row gap-3 ${canGoBack ? 'justify-between' : ''}`}>
+      <div className={`flex gap-3 ${canGoBack ? 'justify-between' : ''}`}>
         {canGoBack && store.step !== 'confirmation' && (
-          <Button variant="outline" onClick={goBack} className="hidden h-12 w-full sm:inline-flex sm:w-auto sm:flex-1">
+          <Button variant="outline" onClick={goBack} className="h-12 flex-1">
             Back
           </Button>
         )}
@@ -263,7 +265,7 @@ export default function BookPage() {
               (store.step === 'time' && !store.selectedTime) ||
               (store.step === 'details' && (!name || !phone || createReservation.isPending))
             }
-            className="h-12 w-full sm:w-auto sm:flex-1"
+            className="h-12 flex-1"
           >
             {continueLabel}
           </Button>
@@ -367,7 +369,7 @@ export default function BookPage() {
                               <Button
                                 key={slot.startTime}
                                 variant={store.selectedTime === slot.startTime ? 'default' : 'outline'}
-                                onClick={() => store.setSelectedTime(slot.startTime)}
+                                onClick={() => selectTime(slot.startTime)}
                                 className="h-12"
                               >
                                 {slot.startTime}
@@ -517,12 +519,6 @@ export default function BookPage() {
           </Card>
         )}
       </div>
-
-      {canGoBack && store.step !== 'confirmation' && (
-        <Button variant="outline" onClick={goBack} className="h-12 w-full sm:hidden">
-          Back
-        </Button>
-      )}
 
     </div>
   );
